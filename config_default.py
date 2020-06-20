@@ -1,3 +1,4 @@
+avalon_api = 'https://avalon.oneloved.tube'
 m3u8_list_upload_path = 'https://skylive.coolhd.hu/write'
 upload_portals = [
     'https://skynet.tutemwesi.com',
