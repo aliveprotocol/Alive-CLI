@@ -58,6 +58,7 @@ def skynet_push(filePath, portal):
 		return False
 
 def ipfs_push(filePath):
+	# TODO: Multiple upload endpoints
 	fileToUpload = {'chunk': open(filePath,'rb')}
 	upload = requests.post('http://localhost:3000/uploadStreamNoAuth',files=fileToUpload)
 	if upload.status_code == 200:
@@ -77,7 +78,7 @@ def upload(filePath, fileId, length):
 		# upload and retry if fails with backup portals
 		skylink = False
 		if upload_protocol == 'Skynet':
-			for upload_portal in config.upload_portals:
+			for upload_portal in config.skynet_upload_portals:
 				skylink = skynet_push(filePath, upload_portal)
 				if skylink != False:
 					break
@@ -169,29 +170,20 @@ def updateDisplay(filearr, symbols):
 	print(table)
 
 def share(fileId, filearr):
-	global m3u8_list_upload_token, is_first_chunk
 	filearr[fileId].status = 'sharing'
-	post = {
-		'token': m3u8_list_upload_token,
-		'url': filearr[fileId].skylink,
-		'length': filearr[fileId].length,
-		'is_first_chunk': is_first_chunk
-		}
-	try:
-		x = requests.post(config.m3u8_list_upload_path, data = post)
-		if (x.text != 'ok'):
-			logging.error('Error: posting failed ' + str(x.text))
-			filearr[fileId].status = 'share failed'
-			return False
-		else:
-			filearr[fileId].status = 'shared'
-			is_first_chunk = 0
-			return True
-	except Exception as e:
-		logging.error('Error: posting failed ' + str(e))
+
+	link = filearr[fileId].skylink
+	length = filearr[fileId].length
+	
+	broadcast_stream = push_stream_avalon(avalon_livestream_link,link,length,avalon_user,avalon_privkey)
+
+	if broadcast_stream != True:
+		logging.error('Failed to push stream to avalon')
 		filearr[fileId].status = 'share failed'
 		return False
-
+	else:
+		filearr[fileId].status = 'shared'
+		return True
 
 def share_thread():
 	global filearr
@@ -229,12 +221,17 @@ def push_stream_avalon(link,hash,len,sender,wif):
 	tx['signature'] = signature
 	headers = {
 		'Accept': 'application/json, text/plain, */*',
-    	'Content-Type': 'application/json'
+		'Content-Type': 'application/json'
 	}
 	broadcast = requests.post(avalon_api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
 	if broadcast.status_code == 200:
 		return True
 	else:
+		try:
+			err = broadcast.json()
+			logging.error(err['error'])
+		except Exception as e:
+			logging.error('Broadcast error: ' + e)
 		return False
 
 class VideoFile:
@@ -316,7 +313,7 @@ logging.info('LOGGING STARTED')
 
 parser = argparse.ArgumentParser('DTube HLS Livestream')
 parser.add_argument('-r','--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
-parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS, BTFS and Skynet, default: IPFS)')
+parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS (default) and Skynet)')
 parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
 
 required_args = parser.add_argument_group('Required arguments')
@@ -341,7 +338,7 @@ if not folderIsEmpty(recordFolder):
 	input('Are you sure, you want to continue? Press Enter to continue...')
 
 if args.protocol:
-	valid_protocols = ['IPFS','BTFS','Skynet']
+	valid_protocols = ['IPFS','Skynet']
 	if args.protocol in valid_protocols:
 		upload_protocol = args.protocol
 	else:
@@ -370,7 +367,7 @@ if avalon_account.json()['pub'] != avalon_pubkey:
 	valid_key = False
 	for i in range(0,len(avalon_account.json()['keys'])):
 		# TODO: Update with the correct op # on livestreaming HF
-		if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and 4 in avalon_account.json()['keys'][i]['types']:
+		if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [19, 20]):
 			avalon_keyid = avalon_account.json()['keys'][i]['id']
 			valid_key = True
 			break
@@ -398,4 +395,4 @@ else:
 		print('Found livestream ' + args.link)
 avalon_livestream_link = args.link
 
-# worker()
+worker()
