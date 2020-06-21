@@ -5,6 +5,7 @@ import sys
 import os
 import cv2
 import requests
+import json
 import shutil
 from siaskynet import Skynet
 import subprocess
@@ -13,6 +14,7 @@ from threading import Thread
 import time
 import base58
 import secp256k1
+import hashlib
 
 
 def runBash(command):
@@ -55,6 +57,15 @@ def skynet_push(filePath, portal):
 		logging.error('Uploading failed with ' + str(portal))
 		return False
 
+def ipfs_push(filePath):
+	fileToUpload = {'chunk': open(filePath,'rb')}
+	upload = requests.post('http://localhost:3000/uploadStreamNoAuth',files=fileToUpload)
+	if upload.status_code == 200:
+		return json.loads(upload.text)['hash']
+	else:
+		logging.error('IPFS upload failed')
+		return False
+
 def upload(filePath, fileId, length):
 	global concurrent_uploads, filearr
 	start_time = time.time()
@@ -64,14 +75,18 @@ def upload(filePath, fileId, length):
 	# upload file until success
 	while True:
 		# upload and retry if fails with backup portals
-		for upload_portal in config.upload_portals:
-			skylink = skynet_push(filePath, upload_portal)
-			if skylink != False:
-				break
-			else:
-				filearr[fileId].status = 'uploading with backup portal'
+		skylink = False
+		if upload_protocol == 'Skynet':
+			for upload_portal in config.upload_portals:
+				skylink = skynet_push(filePath, upload_portal)
+				if skylink != False:
+					break
+				else:
+					filearr[fileId].status = 'uploading with backup portal'
+		elif upload_protocol == 'IPFS':
+			skylink = ipfs_push(filePath)
 
-		if (skylink != False and len(skylink) == 52):
+		if (skylink != False and len(skylink) >= 46):
 			skylink = skylink.replace("sia://", "")
 			filearr[fileId].skylink = skylink
 			if filearr[fileId].status != 'share failed':
@@ -93,13 +108,13 @@ def get_length(filename):
 	duration = frame_count/fps
 	return duration
 
-def chech_m3u8(recordFolder):
+def check_m3u8(recordFolder):
 	for file in os.listdir(recordFolder):
 		if file.endswith(".m3u8"):
 			return True
 	return False
 
-def chech_ts(recordFolder):
+def check_ts(recordFolder):
 	for file in os.listdir(recordFolder):
 		if file.endswith(".ts"):
 			return True
@@ -191,6 +206,36 @@ def share_thread():
 				time.sleep(10)
 		time.sleep(0.2)
 
+def push_stream_avalon(link,hash,len,sender,wif):
+	tx = {
+		'type': 19,
+		'data': {
+			'link': link,
+			'len': len,
+			'hash': {
+				'src': hash
+			}
+		},
+		'sender': sender,
+		'ts': round(time.time() * 1000)
+	}
+	stringifiedTxToHash = json.dumps(tx,separators=(',', ':'))
+	tx['hash'] = hashlib.sha256(stringifiedTxToHash.encode('UTF-8')).hexdigest()
+
+	pk = secp256k1.PrivateKey(base58.b58decode(wif))
+	hexhash = bytes.fromhex(tx['hash'])
+	sign = pk.ecdsa_sign(hexhash,raw=True,digest=hashlib.sha256)
+	signature = base58.b58encode(pk.ecdsa_serialize_compact(sign)).decode('UTF-8')
+	tx['signature'] = signature
+	headers = {
+		'Accept': 'application/json, text/plain, */*',
+    	'Content-Type': 'application/json'
+	}
+	broadcast = requests.post(avalon_api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
+	if broadcast.status_code == 200:
+		return True
+	else:
+		return False
 
 class VideoFile:
 	def __init__(self, fileId):
@@ -227,12 +272,12 @@ def worker():
 
 	cntr = 0
 	while True:
-		if not chech_m3u8(recordFolder):
+		if not check_m3u8(recordFolder):
 			if args.record_folder:
 				record_folder_name = args.record_folder
 			else:
 				record_folder_name = 'record_here'
-			if not (chech_ts(recordFolder)):
+			if not (check_ts(recordFolder)):
 				print('Waiting for recording, no .m3u8 or .ts file found in ' + record_folder_name + ' folder (%ds)' %(cntr))
 			else:
 				print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + record_folder_name + ' folder (%ds)' %(cntr))
@@ -260,7 +305,6 @@ def worker():
 
 concurrent_uploads = 0
 projectPath = os.path.dirname(os.path.abspath(__file__))
-is_first_chunk = 1
 
 logFile = os.path.join(projectPath, "error.log")
 logging.basicConfig(filename=logFile,
@@ -271,12 +315,14 @@ logging.basicConfig(filename=logFile,
 logging.info('LOGGING STARTED')
 
 parser = argparse.ArgumentParser('DTube HLS Livestream')
-parser.add_argument('--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
-parser.add_argument('--protocol', help='P2P protocol for HLS streams (valid values: IPFS, BTFS and Skynet, default: IPFS)')
+parser.add_argument('-r','--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
+parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS, BTFS and Skynet, default: IPFS)')
+parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
 
 required_args = parser.add_argument_group('Required arguments')
-required_args.add_argument('--user', help='Avalon username', required=True)
-required_args.add_argument('--key', help='Avalon key (custom keys must have PUSH_STREAM and END_STREAM permissions)', required=True)
+required_args.add_argument('-u','--user', help='Avalon username', required=True)
+required_args.add_argument('-k','--key', help='Avalon key (custom keys must have PUSH_STREAM and END_STREAM permissions)', required=True)
+required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True)
 
 args = parser.parse_args()
 
@@ -295,32 +341,61 @@ if not folderIsEmpty(recordFolder):
 	input('Are you sure, you want to continue? Press Enter to continue...')
 
 if args.protocol:
-	upload_protocol = args.protocol
+	valid_protocols = ['IPFS','BTFS','Skynet']
+	if args.protocol in valid_protocols:
+		upload_protocol = args.protocol
+	else:
+		print('Invalid P2P protocol')
+		sys.exit(1)
 else:
 	upload_protocol = 'IPFS'
 
+if args.api:
+	avalon_api = args.api
+else:
+	avalon_api = config.avalon_api
+
 # Avalon username
-avalon_account = requests.get(config.avalon_api + '/account/' + args.user)
+avalon_account = requests.get(avalon_api + '/account/' + args.user)
 if avalon_account.status_code != 200:
 	print('Avalon username does not exist')
 	sys.exit(1)
 avalon_user = args.user
 
 # Avalon key
+avalon_keyid = None
+avalon_privkey = args.key
 avalon_pubkey = base58.b58encode(secp256k1.PrivateKey(base58.b58decode(args.key)).pubkey.serialize()).decode('UTF-8')
 if avalon_account.json()['pub'] != avalon_pubkey:
 	valid_key = False
 	for i in range(0,len(avalon_account.json()['keys'])):
 		# TODO: Update with the correct op # on livestreaming HF
 		if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and 4 in avalon_account.json()['keys'][i]['types']:
+			avalon_keyid = avalon_account.json()['keys'][i]['id']
 			valid_key = True
 			break
 	if valid_key == False:
 		print('Invalid Avalon key')
 		sys.exit(1)
 	else:
-		print('Authenticated successfully with custom key')
+		print('Logged in with custom key')
 else:
-	print('Authenticated successfully with master key')
+	print('Logged in with master key')
+
+# Avalon livestream permlink
+if len(args.link) < 1 or len(args.link) > 50:
+	print('Invalid livestream permlink')
+	sys.exit(1)
+else:
+	avalon_live_post = requests.get(avalon_api + '/content/' + avalon_user + '/' + args.link)
+	if avalon_live_post.status_code == 404:
+		print('Livestream not found')
+		sys.exit(1)
+	elif avalon_live_post.status_code != 200:
+		print('Error querying livestream with status code ' + avalon_live_post.status_code)
+		sys.exit(1)
+	else:
+		print('Found livestream ' + args.link)
+avalon_livestream_link = args.link
 
 # worker()
