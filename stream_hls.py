@@ -8,7 +8,6 @@ import requests
 import json
 import shutil
 from siaskynet import Skynet
-import subprocess
 from tabulate import tabulate
 from threading import Thread
 import time
