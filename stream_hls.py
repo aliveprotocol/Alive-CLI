@@ -3,6 +3,7 @@ import config
 import logging
 import sys
 import os
+import glob
 import cv2
 import requests
 import json
@@ -24,14 +25,6 @@ def touchDir(dir, strict = False):
 		raise Exception('Folder already exists: ' + dir)
 	if not os.path.isdir(dir):
 		os.mkdir(dir)
-
-def folderIsEmpty(folder):
-	if not os.path.isdir(folder):
-		return True
-	if os.listdir(folder):
-		return False
-	else:    
-		return True
 
 def rmdir(dir):
 	if os.path.isdir(dir):
@@ -134,11 +127,13 @@ def get_length(filename):
 	duration = frame_count/fps
 	return duration
 
-def check_m3u8(recordFolder):
-	for file in os.listdir(recordFolder):
-		if file.endswith(".m3u8"):
-			return True
-	return False
+def get_latest_m3u8(recordFolder):
+	pattern = os.path.join(recordFolder, '*.m3u8')
+	list_of_files = glob.glob(pattern) # * means all if need specific format then *.csv
+	if not list_of_files:
+		return False
+	latest_file = max(list_of_files, key=os.path.getctime)
+	return latest_file
 
 def check_ts(recordFolder):
 	for file in os.listdir(recordFolder):
@@ -147,7 +142,8 @@ def check_ts(recordFolder):
 	return False
 
 def isPlaylistFinished(recordFolder):
-	playlistFile = os.path.join(recordFolder, "live.m3u8")
+	global stream_filename
+	playlistFile = os.path.join(recordFolder, stream_filename + ".m3u8")
 	with open(playlistFile, 'r') as f:
 		lines = f.read().splitlines()
 		last_line = lines[-1]
@@ -275,9 +271,10 @@ filearr = [
 	# file, status, upload time, length, skylink
 	VideoFile(nextStreamFilename)
 ]
+stream_filename = ''
 
 def worker():
-	global concurrent_uploads, projectPath, recordFolder, filearr, nextStreamFilename
+	global concurrent_uploads, projectPath, recordFolder, filearr, nextStreamFilename, stream_filename
 
 	symbols = {
 		'waiting for file':				' ',
@@ -295,25 +292,30 @@ def worker():
 
 	cntr = 0
 	while True:
-		if not check_m3u8(recordFolder):
-			if args.record_folder:
-				record_folder_name = args.record_folder
+		latest_m3u8 = get_latest_m3u8(recordFolder)
+		if not latest_m3u8:
+			if not (chech_ts(recordFolder)):
+				print('Waiting for recording, no .m3u8 file found in ' + recordFolder + ' folder (%ds)' %(cntr))
 			else:
-				record_folder_name = 'record_here'
-			if not (check_ts(recordFolder)):
-				print('Waiting for recording, no .m3u8 or .ts file found in ' + record_folder_name + ' folder (%ds)' %(cntr))
-			else:
-				print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + record_folder_name + ' folder (%ds)' %(cntr))
+				print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + recordFolder + ' folder')
 			cntr += 1
 			time.sleep(1)
 		else:
-			break
+			filetime = os.path.getctime(latest_m3u8)
+			now = time.time()
+			if now-60 > filetime:
+				print("We found a stream, but it's older than a minute (maybe it is an old recording). Please start (or restart) the recording into " + recordFolder)
+				time.sleep(1)
+			else:
+				# Start uplaoding
+				break
 
+	stream_filename = os.path.basename(latest_m3u8).replace('.m3u8', '')
 
 	Thread(target=share_thread).start()
 	while True:
-		nextFile = os.path.join(recordFolder, "live" + str(nextStreamFilename) + ".ts")
-		nextAfterFile = os.path.join(recordFolder, "live" + str(nextStreamFilename + 1) + ".ts")
+		nextFile = os.path.join(recordFolder, stream_filename + str(nextStreamFilename) + ".ts")
+		nextAfterFile = os.path.join(recordFolder, stream_filename + str(nextStreamFilename + 1) + ".ts")
 		updateDisplay(filearr, symbols)
 		if concurrent_uploads < 10 and ( os.path.isfile(nextAfterFile) or ( isPlaylistFinished(recordFolder) and os.path.isfile(nextFile) ) ):
 			filearr.append(VideoFile(nextStreamFilename + 1))
