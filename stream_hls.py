@@ -15,7 +15,7 @@ import time
 import base58
 import secp256k1
 import hashlib
-
+import decrypt
 
 def runBash(command):
 	os.system(command)
@@ -59,12 +59,16 @@ def skynet_push(filePath, portal):
 
 def ipfs_push(filePath):
 	# TODO: Multiple upload endpoints
-	fileToUpload = {'chunk': open(filePath,'rb')}
-	upload = requests.post('http://localhost:3000/uploadStreamNoAuth',files=fileToUpload)
-	if upload.status_code == 200:
-		return json.loads(upload.text)['hash']
+	if upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+		fileToUpload = {'chunk': open(filePath,'rb')}
+		postUrl = upload_endpoint + '/uploadStream?access_token=' + access_token
+		upload = requests.post(postUrl,files=fileToUpload)
+		if upload.status_code == 200:
+			return json.loads(upload.text)['hash']
+		else:
+			logging.error('IPFS upload failed')
+			return False
 	else:
-		logging.error('IPFS upload failed')
 		return False
 
 def upload(filePath, fileId, length):
@@ -101,6 +105,28 @@ def upload(filePath, fileId, length):
 			time.sleep(10)
 			filearr[fileId].status = 're-uploading'
 
+def upload_endpoint_auth():
+	if upload_protocol == 'IPFS' and upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+		loginUrl = upload_endpoint + '/login?dtc=true&user=' + avalon_user
+		if avalon_keyid != None:
+			loginUrl += '&dtckeyid=' + avalon_keyid
+		auth_request = requests.get(loginUrl)
+		if auth_request.status_code != 200:
+			return False
+
+		# Decrypt with Avalon key
+		encrypted_memo = auth_request.json()['encrypted_memo']
+		decrypted_memo = decrypt.ecies_decrypt(base58.b58decode(avalon_privkey),decrypt.js_to_py_encrypted(encrypted_memo))
+
+		# Obtain access token
+		headers = { 'Content-Type': 'text/plain' }
+		access_token_request = requests.post(upload_endpoint + '/logincb',data=decrypted_memo,headers=headers)
+		if access_token_request.status_code != 200:
+			return False
+		else:
+			return access_token_request.json()['access_token']
+	else:
+		return 'noauth'
 
 def get_length(filename):
 	cap = cv2.VideoCapture(filename)
@@ -315,6 +341,7 @@ parser = argparse.ArgumentParser('DTube HLS Livestream')
 parser.add_argument('-r','--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
 parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS (default) and Skynet)')
 parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
+parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint')
 
 required_args = parser.add_argument_group('Required arguments')
 required_args.add_argument('-u','--user', help='Avalon username', required=True)
@@ -394,5 +421,17 @@ else:
 	else:
 		print('Found livestream ' + args.link)
 avalon_livestream_link = args.link
+
+# Authenticate with upload endpoint
+if args.endpoint:
+	upload_endpoint = args.endpoint
+else:
+	upload_endpoint = config.ipfs_upload_endpoint
+
+access_token = upload_endpoint_auth()
+
+if access_token == False:
+	print('Upload endpoint authentication failed')
+	sys.exit(1)
 
 worker()
