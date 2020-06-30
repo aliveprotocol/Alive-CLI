@@ -296,7 +296,7 @@ def worker():
 	while True:
 		latest_m3u8 = get_latest_m3u8(recordFolder)
 		if not latest_m3u8:
-			if not (chech_ts(recordFolder)):
+			if not (check_ts(recordFolder)):
 				print('Waiting for recording, no .m3u8 file found in ' + recordFolder + ' folder (%ds)' %(cntr))
 			else:
 				print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + recordFolder + ' folder')
@@ -364,10 +364,6 @@ if (args.record_folder):
 		recordFolder = os.path.join(projectPath, args.record_folder)
 else:
 	recordFolder = os.path.join(projectPath, "record_here")
-
-if not folderIsEmpty(recordFolder):
-	print('Record folder is not empty: ' + recordFolder)
-	input('Are you sure, you want to continue? Press Enter to continue...')
 
 if args.protocol:
 	valid_protocols = ['IPFS','Skynet']
