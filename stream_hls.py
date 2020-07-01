@@ -30,6 +30,16 @@ def rmdir(dir):
 	if os.path.isdir(dir):
 		shutil.rmtree(dir)
 
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def skynet_push(filePath, portal):
 	logging.debug('Uploading ' + str(filePath) + ' with ' + str(portal))
 
@@ -90,6 +100,8 @@ def upload(filePath, fileId, length):
 				filearr[fileId].status = 'share queued'
 			filearr[fileId].uploadTime = round(time.time() - start_time)
 			concurrent_uploads -= 1
+			if purge_files == True:
+				os.remove(filePath)
 			return True
 		else:
 			logging.error('Upload failed with all portals for ' + str(filePath))
@@ -334,7 +346,7 @@ concurrent_uploads = 0
 projectPath = os.path.expanduser( os.path.join('~', '.SkyLive'))
 touchDir(projectPath)
 
-logFile = os.path.join(projectPath, "error.log")
+logFile = os.path.join(projectPath, "stream_hls.log")
 logging.basicConfig(filename=logFile,
 	filemode='a',
 	format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
@@ -344,6 +356,7 @@ logging.info('LOGGING STARTED')
 
 parser = argparse.ArgumentParser('DTube HLS Livestream')
 parser.add_argument('-r','--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
+parser.add_argument('-f','--purge_files', type=str2bool, nargs='?', const=True, default=False, help='Purges .ts chunks after upload (default: false)')
 parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS (default) and Skynet)')
 parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
 parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint')
@@ -364,6 +377,8 @@ if (args.record_folder):
 		recordFolder = os.path.join(projectPath, args.record_folder)
 else:
 	recordFolder = os.path.join(projectPath, "record_here")
+
+purge_files = args.purge_files
 
 if args.protocol:
 	valid_protocols = ['IPFS','Skynet']
