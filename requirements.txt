@@ -8,3 +8,4 @@ base58>=2.0.1
 secp256k1
 cryptography
 eth_utils
+ipfshttpclient>=0.6.0

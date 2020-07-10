@@ -15,6 +15,7 @@ import time
 import base58
 import secp256k1
 import hashlib
+import ipfshttpclient
 import decrypt
 
 def runBash(command):
@@ -70,6 +71,10 @@ def ipfs_push(filePath):
 		else:
 			logging.error('IPFS upload failed')
 			return False
+	elif is_ipfs_api == True:
+		# Assume IPFS API unless stated otherwise
+		ipfs_add = ipfs_api.add(filePath,trickle=True)
+		return ipfs_add['Hash']
 	else:
 		return False
 
@@ -110,7 +115,7 @@ def upload(filePath, fileId, length):
 			filearr[fileId].status = 're-uploading'
 
 def upload_endpoint_auth():
-	if upload_protocol == 'IPFS' and upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+	if upload_protocol == 'IPFS' and upload_endpoint != None and upload_endpoint in config.authenticated_ipfs_upload_endpoints:
 		loginUrl = upload_endpoint + '/login?dtc=true&user=' + avalon_user
 		if avalon_keyid != None:
 			loginUrl += '&dtckeyid=' + avalon_keyid
@@ -268,6 +273,7 @@ def push_stream_avalon(link,hash,len,sender,wif):
 			logging.error(err['error'])
 		except Exception as e:
 			logging.error('Broadcast error: ' + e)
+		logging.error('Transaction: ' + json.dump(tx))
 		return False
 
 class VideoFile:
@@ -360,6 +366,7 @@ parser.add_argument('-f','--purge_files', type=str2bool, nargs='?', const=True, 
 parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS (default) and Skynet)')
 parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
 parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint')
+parser.add_argument('-i','--ipfs_api', help='IPFS API in multiaddr format (e.g. /ip4/127.0.0.1/tcp/5001/http)')
 
 required_args = parser.add_argument_group('Required arguments')
 required_args.add_argument('-u','--user', help='Avalon username', required=True)
@@ -441,6 +448,10 @@ avalon_livestream_link = args.link
 # Authenticate with upload endpoint
 if args.endpoint:
 	upload_endpoint = args.endpoint
+elif args.ipfs_api:
+	is_ipfs_api = True
+	ipfs_api = ipfshttpclient.connect(args.ipfs_api)
+	upload_endpoint = None
 else:
 	upload_endpoint = config.ipfs_upload_endpoint
 
