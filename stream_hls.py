@@ -239,9 +239,9 @@ def push_stream_avalon(link,hash,len,sender,wif):
 		'type': 19,
 		'data': {
 			'link': link,
-			'len': len,
+			'len': [len],
 			'hash': {
-				'src': hash
+				'src': [hash]
 			}
 		},
 		'sender': sender,
