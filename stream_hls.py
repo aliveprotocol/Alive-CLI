@@ -8,7 +8,7 @@ import cv2
 import requests
 import json
 import shutil
-from siaskynet import Skynet
+import siaskynet as skynet
 from tabulate import tabulate
 from threading import Thread
 import time
@@ -17,6 +17,8 @@ import secp256k1
 import hashlib
 import ipfshttpclient
 import decrypt
+
+skynetClient = skynet.SkynetClient(config.skynet_upload_portals[0])
 
 def runBash(command):
 	os.system(command)
@@ -52,7 +54,7 @@ def skynet_push(filePath, portal):
 
 	try:
 		try:
-			return Skynet.upload_file(filePath, opts)            
+			return skynetClient.upload_file(filePath, opts)            
 		except TimeoutError:
 			logging.error('Uploading timeout with ' + str(portal))
 			return False
