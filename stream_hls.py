@@ -275,7 +275,7 @@ def push_stream_avalon(link,hash,len,sender,wif):
 			logging.error(err['error'])
 		except Exception as e:
 			logging.error('Broadcast error: ' + e)
-		logging.error('Transaction: ' + json.dump(tx))
+		logging.error('Transaction: ' + json.dumps(tx))
 		return False
 
 class VideoFile:
