@@ -63,7 +63,7 @@ def updateDisplay(filearr, symbols):
 	status = ['Status']
 	length = ['Length']
 	uptime = ['Upload time']
-	terminalColumns = shutil.get_terminal_size()
+	terminalColumns, _ = shutil.get_terminal_size()
 	showRows = int(terminalColumns/7) - 3
 	ran = len(filearr) if (len(filearr) < showRows) else showRows
 	for i in range(ran):
@@ -101,17 +101,16 @@ class AliveInstance:
 	"""
 	Data class that holds configuration for AliveDaemon.
 	"""
+	protocol: str
+	upload_endpoint: str
+	network: str
+	api: str
+	username: str
+	private_key: str
+	link: str
 	data_dir: str = os.path.expanduser(os.path.join('~', '.alive'))
 	record_folder: str = 'record_here'
 	purge_files: bool = False
-	protocol: str = 'IPFS'
-	network: str
-	api: str
-	upload_endpoint: str = '/ip4/127.0.0.1/tcp/5001/http'
-	username: str
-	private_key: str
-	custom_keyid = None
-	link: str
 
 	def __post_init__(self) -> None:
 		"""
@@ -149,6 +148,7 @@ class AliveInstance:
 				else:
 					print('Logged in with custom key')
 			else:
+				self.custom_keyid = None
 				print('Logged in with master key')
 		elif self.network == 'hive':
 			raise NotImplementedError('Alive Protocol coming soon to Hive...')
