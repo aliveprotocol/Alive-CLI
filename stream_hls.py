@@ -1,10 +1,12 @@
+from dataclasses import dataclass
+import re
 import argparse
 import config
 import logging
 import sys
 import os
 import glob
-import cv2
+from cv2 import cv2
 import requests
 import json
 import shutil
@@ -18,126 +20,11 @@ import hashlib
 import ipfshttpclient
 import decrypt
 
-skynetClient = skynet.SkynetClient(config.skynet_upload_portals[0])
-
-def runBash(command):
-	os.system(command)
-
 def touchDir(dir, strict = False):
 	if (strict == True and os.path.isdir(dir)):
 		raise Exception('Folder already exists: ' + dir)
 	if not os.path.isdir(dir):
 		os.mkdir(dir)
-
-def rmdir(dir):
-	if os.path.isdir(dir):
-		shutil.rmtree(dir)
-
-def str2bool(v):
-    if isinstance(v, bool):
-       return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
-def skynet_push(filePath, portal):
-	logging.debug('Uploading ' + str(filePath) + ' with ' + str(portal))
-
-	opts = type('obj', (object,), {
-		'portal_url': portal,
-		'timeout': 60,
-		'timeout_seconds': 60
-	})
-
-	try:
-		try:
-			return skynetClient.upload_file(filePath, opts)            
-		except TimeoutError:
-			logging.error('Uploading timeout with ' + str(portal))
-			return False
-	except:
-		logging.error('Uploading failed with ' + str(portal))
-		return False
-
-def ipfs_push(filePath):
-	# TODO: Multiple upload endpoints
-	if upload_endpoint in config.authenticated_ipfs_upload_endpoints:
-		fileToUpload = {'chunk': open(filePath,'rb')}
-		postUrl = upload_endpoint + '/uploadStream?access_token=' + access_token
-		upload = requests.post(postUrl,files=fileToUpload)
-		if upload.status_code == 200:
-			return json.loads(upload.text)['hash']
-		else:
-			logging.error('IPFS upload failed')
-			return False
-	elif is_ipfs_api == True:
-		# Assume IPFS API unless stated otherwise
-		ipfs_add = ipfs_api.add(filePath,trickle=True)
-		return ipfs_add['Hash']
-	else:
-		return False
-
-def upload(filePath, fileId, length):
-	global concurrent_uploads, filearr
-	start_time = time.time()
-	concurrent_uploads += 1
-	filearr[fileId].status = 'uploading'
-
-	# upload file until success
-	while True:
-		# upload and retry if fails with backup portals
-		skylink = False
-		if upload_protocol == 'Skynet':
-			for upload_portal in config.skynet_upload_portals:
-				skylink = skynet_push(filePath, upload_portal)
-				if skylink != False:
-					break
-				else:
-					filearr[fileId].status = 'uploading with backup portal'
-		elif upload_protocol == 'IPFS':
-			skylink = ipfs_push(filePath)
-
-		if (skylink != False and len(skylink) >= 46):
-			skylink = skylink.replace("sia://", "")
-			filearr[fileId].skylink = skylink
-			if filearr[fileId].status != 'share failed':
-				filearr[fileId].status = 'share queued'
-			filearr[fileId].uploadTime = round(time.time() - start_time)
-			concurrent_uploads -= 1
-			if purge_files == True:
-				os.remove(filePath)
-			return True
-		else:
-			logging.error('Upload failed with all portals for ' + str(filePath))
-			filearr[fileId].status = 'queued for re-uploading'
-			time.sleep(10)
-			filearr[fileId].status = 're-uploading'
-
-def upload_endpoint_auth():
-	if upload_protocol == 'IPFS' and upload_endpoint != None and upload_endpoint in config.authenticated_ipfs_upload_endpoints:
-		loginUrl = upload_endpoint + '/login?dtc=true&user=' + avalon_user
-		if avalon_keyid != None:
-			loginUrl += '&dtckeyid=' + avalon_keyid
-		auth_request = requests.get(loginUrl)
-		if auth_request.status_code != 200:
-			return False
-
-		# Decrypt with Avalon key
-		encrypted_memo = auth_request.json()['encrypted_memo']
-		decrypted_memo = decrypt.ecies_decrypt(base58.b58decode(avalon_privkey),decrypt.js_to_py_encrypted(encrypted_memo))
-
-		# Obtain access token
-		headers = { 'Content-Type': 'text/plain' }
-		access_token_request = requests.post(upload_endpoint + '/logincb',data=decrypted_memo,headers=headers)
-		if access_token_request.status_code != 200:
-			return False
-		else:
-			return access_token_request.json()['access_token']
-	else:
-		return 'noauth'
 
 def get_length(filename):
 	cap = cv2.VideoCapture(filename)
@@ -160,19 +47,6 @@ def check_ts(recordFolder):
 			return True
 	return False
 
-def isPlaylistFinished(recordFolder):
-	global stream_filename
-	playlistFile = os.path.join(recordFolder, stream_filename + ".m3u8")
-	if (os.stat(playlistFile).st_size == 0):
-		return False
-	with open(playlistFile, 'r') as f:
-		lines = f.read().splitlines()
-		last_line = lines[-1]
-		if last_line == '#EXT-X-ENDLIST':
-			return True
-		else:
-			return False
-
 def updateDisplay(filearr, symbols):
 	print_str = '\n\n\n\n\n\n\n\n\n'
 	print_str += 'Status symbols:\n'
@@ -189,7 +63,7 @@ def updateDisplay(filearr, symbols):
 	status = ['Status']
 	length = ['Length']
 	uptime = ['Upload time']
-	terminalColumns, terminalRows = shutil.get_terminal_size()
+	terminalColumns = shutil.get_terminal_size()
 	showRows = int(terminalColumns/7) - 3
 	ran = len(filearr) if (len(filearr) < showRows) else showRows
 	for i in range(ran):
@@ -212,72 +86,6 @@ def updateDisplay(filearr, symbols):
 	print_str += table
 	print(print_str)
 
-def share(fileId, filearr):
-	filearr[fileId].status = 'sharing'
-
-	link = filearr[fileId].skylink
-	length = filearr[fileId].length
-	
-	broadcast_stream = push_stream_avalon(avalon_livestream_link,link,length,avalon_user,avalon_privkey)
-
-	if broadcast_stream != True:
-		logging.error('Failed to push stream to avalon')
-		filearr[fileId].status = 'share failed'
-		return False
-	else:
-		filearr[fileId].status = 'shared'
-		return True
-
-def share_thread():
-	global filearr
-	lastSharedFileId = -1
-	# check_share_queue(check_share_queue, filearr)
-	while True:
-		nextToShare = lastSharedFileId + 1
-		if filearr[nextToShare].status == 'share queued' or filearr[nextToShare].status == 'share failed':
-			if share(nextToShare, filearr) == True:
-				lastSharedFileId += 1
-			else:
-				time.sleep(10)
-		time.sleep(0.2)
-
-def push_stream_avalon(link,hash,len,sender,wif):
-	tx = {
-		'type': 19,
-		'data': {
-			'link': link,
-			'len': [len],
-			'hash': {
-				'src': [hash]
-			}
-		},
-		'sender': sender,
-		'ts': round(time.time() * 1000)
-	}
-	stringifiedTxToHash = json.dumps(tx,separators=(',', ':'))
-	tx['hash'] = hashlib.sha256(stringifiedTxToHash.encode('UTF-8')).hexdigest()
-
-	pk = secp256k1.PrivateKey(base58.b58decode(wif))
-	hexhash = bytes.fromhex(tx['hash'])
-	sign = pk.ecdsa_sign(hexhash,raw=True,digest=hashlib.sha256)
-	signature = base58.b58encode(pk.ecdsa_serialize_compact(sign)).decode('UTF-8')
-	tx['signature'] = signature
-	headers = {
-		'Accept': 'application/json, text/plain, */*',
-		'Content-Type': 'application/json'
-	}
-	broadcast = requests.post(avalon_api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
-	if broadcast.status_code == 200:
-		return True
-	else:
-		try:
-			err = broadcast.json()
-			logging.error(err['error'])
-		except Exception as e:
-			logging.error('Broadcast error: ' + e)
-		logging.error('Transaction: ' + json.dumps(tx))
-		return False
-
 class VideoFile:
 	def __init__(self, fileId):
 		self.fileId = fileId
@@ -288,179 +96,333 @@ class VideoFile:
 	def __str__(self):
 		return str(self.__dict__)
 
-nextStreamFilename = 0
-filearr = [
-	# file, status, upload time, length, skylink
-	VideoFile(nextStreamFilename)
-]
-stream_filename = ''
+@dataclass
+class AliveInstance:
+	"""
+	Data class that holds configuration for AliveDaemon.
+	"""
+	data_dir: str = os.path.expanduser(os.path.join('~', '.alive'))
+	record_folder: str = 'record_here'
+	purge_files: bool = False
+	protocol: str = 'IPFS'
+	network: str
+	api: str
+	upload_endpoint: str = '/ip4/127.0.0.1/tcp/5001/http'
+	username: str
+	private_key: str
+	custom_keyid = None
+	link: str
 
-def worker():
-	global concurrent_uploads, projectPath, recordFolder, filearr, nextStreamFilename, stream_filename
+	def __post_init__(self) -> None:
+		"""
+		Validates each value passed in AliveInstance and performs neccessary authentication.
+		"""
+		if self.protocol not in config.valid_protocols:
+			raise ValueError('Invalid P2P protocol. Valid values are IPFS and Skynet.')
 
-	symbols = {
-		'waiting for file':				' ',
-		'upload queued':				'.',
-		'uploading':					'↑',
-		'uploading with backup portal':	'↕',
-		'queued for re-uploading':		'↔',
-		're-uploading':					'↨',
-		'share queued':					'▒',
-		'sharing':						'▓',
-		'shared':						'█',
-		'share failed':					'x'
-	}
-	touchDir(recordFolder)
+		if self.network not in config.valid_networks:
+			raise ValueError('Invalid network. Valid values are dtc and hive.')
 
-	cntr = 0
-	while True:
-		latest_m3u8 = get_latest_m3u8(recordFolder)
-		if not latest_m3u8:
-			if not (check_ts(recordFolder)):
-				print('Waiting for recording, no .m3u8 file found in ' + recordFolder + ' folder (%ds)' %(cntr))
+		# Init record folder
+		if (os.path.isabs(self.record_folder) == False):
+			self.record_folder = os.path.join(self.data_dir, self.record_folder)
+
+		# Network authentication
+		if self.network == 'dtc':
+			# Avalon username
+			avalon_account = requests.get(self.api + '/account/' + self.username)
+			if avalon_account.status_code != 200:
+				raise RuntimeError('Avalon username does not exist')
+
+			# Avalon key
+			avalon_pubkey = base58.b58encode(secp256k1.PrivateKey(base58.b58decode(self.private_key)).pubkey.serialize()).decode('UTF-8')
+			if avalon_account.json()['pub'] != avalon_pubkey:
+				valid_key = False
+				for i in range(0,len(avalon_account.json()['keys'])):
+					# TODO: Update with the correct op # on livestreaming HF
+					if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [19, 20]):
+						self.custom_keyid = avalon_account.json()['keys'][i]['id']
+						valid_key = True
+						break
+				if valid_key == False:
+					raise RuntimeError('Invalid Avalon key')
+				else:
+					print('Logged in with custom key')
 			else:
-				print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + recordFolder + ' folder')
-			cntr += 1
-			time.sleep(1)
-		else:
-			filetime = os.path.getctime(latest_m3u8)
-			now = time.time()
-			if now-60 > filetime:
-				print("We found a stream, but it's older than a minute (maybe it is an old recording). Please start (or restart) the recording into " + recordFolder)
+				print('Logged in with master key')
+		elif self.network == 'hive':
+			raise NotImplementedError('Alive Protocol coming soon to Hive...')
+
+		# Validate link
+		self.__link_validator__(self.link)
+
+		# Upload endpoint authentication
+		self.access_token = self.__upload_endpoint_auth__()
+
+
+	def __link_validator__(self, link: str) -> None:
+		"""
+		Validates Alive streams permlink
+		"""
+		if len(link) < 1 or len(link) > 50:
+			raise ValueError('Link must be between 1 and 50 characters long')
+
+		if len(re.findall('^[A-Za-z0-9-_]*$',link)) < 1:
+			raise ValueError('Link must only contain letters, digits, dashes and underscores')
+
+	def __upload_endpoint_auth__(self) -> str:
+		if self.protocol == 'IPFS' and self.upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+			loginUrl = self.upload_endpoint + '/login?user=' + self.username + '&network=' + self.network
+			if self.network == 'dtc' and self.custom_keyid != None:
+				loginUrl += '&dtckeyid=' + self.custom_keyid
+			auth_request = requests.get(loginUrl)
+			if auth_request.status_code != 200:
+				# TODO: Raise appropriate error message
+				raise RuntimeError('Could not authenticate to upload endpoint')
+
+			# Decrypt with Avalon key
+			encrypted_memo = auth_request.json()['encrypted_memo']
+			decrypted_memo = None
+			if self.network == 'dtc':
+				decrypt.ecies_decrypt(base58.b58decode(self.private_key),decrypt.js_to_py_encrypted(encrypted_memo))
+			elif self.network == 'hive':
+				raise NotImplementedError('Alive Protocol coming soon to Hive...')
+
+			# Obtain access token
+			headers = { 'Content-Type': 'text/plain' }
+			access_token_request = requests.post(self.upload_endpoint + '/logincb',data=decrypted_memo,headers=headers)
+			if access_token_request.status_code != 200:
+				# TODO: Raise appropriate error
+				raise RuntimeError('Could not authenticate to upload endpoint')
+			else:
+				return access_token_request.json()['access_token']
+		elif self.protocol == 'IPFS':
+			self.ipfs_api = ipfshttpclient.connect(self.upload_endpoint)
+		elif self.protocol == 'Skynet':
+			self.skynet_api = skynet.SkynetClient(self.upload_endpoint)
+		return 'noauth'
+
+
+class AliveDaemon:
+	"""
+	Main daemon for Alive streams.
+	"""
+	concurrent_uploads = 0
+	nextStreamFilename = 0
+	stream_filename = ''
+
+	def __init__(self, instance: AliveInstance):
+		# Setup instance
+		self.instance = instance
+		touchDir(self.instance.data_dir)
+
+		self.filearr = [VideoFile(self.nextStreamFilename)]
+
+		# Logging
+		logFile = os.path.join(self.instance.data_dir, "stream_hls.log")
+		logging.basicConfig(filename=logFile,
+			filemode='a',
+			format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+			datefmt='%H:%M:%S',
+			level=logging.DEBUG)
+		logging.info('LOGGING STARTED')
+
+	def start_worker(self):
+		symbols = {
+			'waiting for file':				' ',
+			'upload queued':				'.',
+			'uploading':					'↑',
+			'uploading with backup portal':	'↕',
+			'queued for re-uploading':		'↔',
+			're-uploading':					'↨',
+			'share queued':					'▒',
+			'sharing':						'▓',
+			'shared':						'█',
+			'share failed':					'x'
+		}
+		touchDir(self.instance.record_folder)
+
+		cntr = 0
+		while True:
+			latest_m3u8 = get_latest_m3u8(self.instance.record_folder)
+			if not latest_m3u8:
+				if not (check_ts(self.instance.record_folder)):
+					print('Waiting for recording, no .m3u8 file found in ' + self.instance.record_folder + ' folder (%ds)' %(cntr))
+				else:
+					print('Starting uploading... Waiting for first chunk and for .m3u8 file in ' + self.instance.record_folder + ' folder')
+				cntr += 1
 				time.sleep(1)
 			else:
-				# Start uplaoding
-				break
+				filetime = os.path.getctime(latest_m3u8)
+				now = time.time()
+				if now-60 > filetime:
+					print("We found a stream, but it's older than a minute (maybe it is an old recording). Please start (or restart) the recording into " + self.instance.record_folder)
+					time.sleep(1)
+				else:
+					# Start uplaoding
+					break
 
-	stream_filename = os.path.basename(latest_m3u8).replace('.m3u8', '')
+		self.stream_filename = os.path.basename(latest_m3u8).replace('.m3u8', '')
 
-	Thread(target=share_thread).start()
-	while True:
-		nextFile = os.path.join(recordFolder, stream_filename + str(nextStreamFilename) + ".ts")
-		nextAfterFile = os.path.join(recordFolder, stream_filename + str(nextStreamFilename + 1) + ".ts")
-		updateDisplay(filearr, symbols)
-		if concurrent_uploads < 10 and ( os.path.isfile(nextAfterFile) or ( isPlaylistFinished(recordFolder) and os.path.isfile(nextFile) ) ):
-			filearr.append(VideoFile(nextStreamFilename + 1))
-			filearr[nextStreamFilename].status = 'upload queued'
-			nextLen = get_length(nextFile)
-			filearr[nextStreamFilename].length = nextLen
-			Thread(target=upload, args=(nextFile, nextStreamFilename, nextLen)).start()
-			nextStreamFilename += 1
+		Thread(target=self.share_thread).start()
+		while True:
+			nextFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename) + ".ts")
+			nextAfterFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename + 1) + ".ts")
+			updateDisplay(self.filearr, symbols)
+			if self.concurrent_uploads < 10 and ( os.path.isfile(nextAfterFile) or ( self.isPlaylistFinished(self.instance.record_folder) and os.path.isfile(nextFile) ) ):
+				self.filearr.append(VideoFile(self.nextStreamFilename + 1))
+				self.filearr[self.nextStreamFilename].status = 'upload queued'
+				nextLen = get_length(nextFile)
+				self.filearr[self.nextStreamFilename].length = nextLen
+				Thread(target=self.upload, args=(nextFile, self.nextStreamFilename, nextLen)).start()
+				self.nextStreamFilename += 1
+			else:
+				time.sleep(1)
+
+	def upload(self, filePath, fileId, length):
+		start_time = time.time()
+		self.concurrent_uploads += 1
+		self.filearr[fileId].status = 'uploading'
+
+		# upload file until success
+		while True:
+			# upload and retry if fails with backup portals
+			skylink = False
+			if self.instance.protocol == 'Skynet':
+				for upload_portal in config.skynet_upload_portals:
+					skylink = self.skynet_push(filePath, upload_portal)
+					if skylink != False:
+						break
+					else:
+						self.filearr[fileId].status = 'uploading with backup portal'
+			elif self.instance.protocol == 'IPFS':
+				skylink = self.ipfs_push(filePath)
+
+			if (skylink != False and len(skylink) >= 46):
+				skylink = skylink.replace("sia://", "")
+				self.filearr[fileId].skylink = skylink
+				if self.filearr[fileId].status != 'share failed':
+					self.filearr[fileId].status = 'share queued'
+				self.filearr[fileId].uploadTime = round(time.time() - start_time)
+				self.concurrent_uploads -= 1
+				if self.instance.purge_files == True:
+					os.remove(filePath)
+				return True
+			else:
+				logging.error('Upload failed with all portals for ' + str(filePath))
+				self.filearr[fileId].status = 'queued for re-uploading'
+				time.sleep(10)
+				self.filearr[fileId].status = 're-uploading'
+
+	def isPlaylistFinished(self,recordFolder):
+		playlistFile = os.path.join(recordFolder, self.stream_filename + ".m3u8")
+		if (os.stat(playlistFile).st_size == 0):
+			return False
+		with open(playlistFile, 'r') as f:
+			lines = f.read().splitlines()
+			last_line = lines[-1]
+			if last_line == '#EXT-X-ENDLIST':
+				return True
+			else:
+				return False
+
+	def share_thread(self):
+		lastSharedFileId = -1
+		# check_share_queue(check_share_queue, filearr)
+		while True:
+			nextToShare = lastSharedFileId + 1
+			if self.filearr[nextToShare].status == 'share queued' or self.filearr[nextToShare].status == 'share failed':
+				if self.share(nextToShare) == True:
+					lastSharedFileId += 1
+				else:
+					time.sleep(10)
+			time.sleep(0.2)
+
+	def share(self,fileId):
+		self.filearr[fileId].status = 'sharing'
+
+		link = self.filearr[fileId].skylink
+		length = self.filearr[fileId].length
+		
+		# TODO: Hive Custom JSONs
+		broadcast_stream = self.push_stream_avalon(link,length)
+
+		if broadcast_stream != True:
+			logging.error('Failed to push stream to avalon')
+			self.filearr[fileId].status = 'share failed'
+			return False
 		else:
-			time.sleep(1)
-	
+			self.filearr[fileId].status = 'shared'
+			return True
 
-concurrent_uploads = 0
-projectPath = os.path.expanduser( os.path.join('~', '.SkyLive'))
-touchDir(projectPath)
+	def skynet_push(self,filePath, portal):
+		logging.debug('Uploading ' + str(filePath) + ' with ' + str(portal))
 
-logFile = os.path.join(projectPath, "stream_hls.log")
-logging.basicConfig(filename=logFile,
-	filemode='a',
-	format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-	datefmt='%H:%M:%S',
-	level=logging.DEBUG)
-logging.info('LOGGING STARTED')
+		opts = type('obj', (object,), {
+			'portal_url': portal,
+			'timeout': 60,
+			'timeout_seconds': 60
+		})
 
-parser = argparse.ArgumentParser('DTube HLS Livestream')
-parser.add_argument('-r','--record_folder', help='Record folder, where m3u8 and ts files will be located (default: record_here)')
-parser.add_argument('-f','--purge_files', type=str2bool, nargs='?', const=True, default=False, help='Purges .ts chunks after upload (default: false)')
-parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams (valid values: IPFS (default) and Skynet)')
-parser.add_argument('-a','--api', help='Avalon API node (default: ' + config.avalon_api + ')')
-parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint')
-parser.add_argument('-i','--ipfs_api', help='IPFS API in multiaddr format (e.g. /ip4/127.0.0.1/tcp/5001/http)')
+		try:
+			try:
+				return self.instance.skynet_api.upload_file(filePath, opts)            
+			except TimeoutError:
+				logging.error('Uploading timeout with ' + str(portal))
+				return False
+		except:
+			logging.error('Uploading failed with ' + str(portal))
+			return False
 
-required_args = parser.add_argument_group('Required arguments')
-required_args.add_argument('-u','--user', help='Avalon username', required=True)
-required_args.add_argument('-k','--key', help='Avalon key (custom keys must have PUSH_STREAM and END_STREAM permissions)', required=True)
-required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True)
+	def ipfs_push(self,filePath):
+		# TODO: Multiple upload endpoints
+		if self.instance.upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+			fileToUpload = {'chunk': open(filePath,'rb')}
+			postUrl = self.instance.upload_endpoint + '/uploadStream?access_token=' + self.instance.access_token
+			upload = requests.post(postUrl,files=fileToUpload)
+			if upload.status_code == 200:
+				return json.loads(upload.text)['hash']
+			else:
+				logging.error('IPFS upload failed')
+				return False
+		else:
+			# Assume IPFS API unless stated otherwise
+			ipfs_add = self.instance.ipfs_api.add(filePath,trickle=True)
+			return ipfs_add['Hash']
 
-args = parser.parse_args()
+	def push_stream_avalon(self,hash,len):
+		tx = {
+			'type': 19,
+			'data': {
+				'link': self.instance.link,
+				'len': [len],
+				'hash': {
+					'src': [hash]
+				}
+			},
+			'sender': self.instance.username,
+			'ts': round(time.time() * 1000)
+		}
+		stringifiedTxToHash = json.dumps(tx,separators=(',', ':'))
+		tx['hash'] = hashlib.sha256(stringifiedTxToHash.encode('UTF-8')).hexdigest()
 
-
-# get recordFolder
-if (args.record_folder):
-	if (os.path.isabs(args.record_folder)):
-		recordFolder = args.record_folder
-	else:
-		recordFolder = os.path.join(projectPath, args.record_folder)
-else:
-	recordFolder = os.path.join(projectPath, "record_here")
-
-purge_files = args.purge_files
-
-if args.protocol:
-	valid_protocols = ['IPFS','Skynet']
-	if args.protocol in valid_protocols:
-		upload_protocol = args.protocol
-	else:
-		print('Invalid P2P protocol')
-		sys.exit(1)
-else:
-	upload_protocol = 'IPFS'
-
-if args.api:
-	avalon_api = args.api
-else:
-	avalon_api = config.avalon_api
-
-# Avalon username
-avalon_account = requests.get(avalon_api + '/account/' + args.user)
-if avalon_account.status_code != 200:
-	print('Avalon username does not exist')
-	sys.exit(1)
-avalon_user = args.user
-
-# Avalon key
-avalon_keyid = None
-avalon_privkey = args.key
-avalon_pubkey = base58.b58encode(secp256k1.PrivateKey(base58.b58decode(args.key)).pubkey.serialize()).decode('UTF-8')
-if avalon_account.json()['pub'] != avalon_pubkey:
-	valid_key = False
-	for i in range(0,len(avalon_account.json()['keys'])):
-		# TODO: Update with the correct op # on livestreaming HF
-		if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [19, 20]):
-			avalon_keyid = avalon_account.json()['keys'][i]['id']
-			valid_key = True
-			break
-	if valid_key == False:
-		print('Invalid Avalon key')
-		sys.exit(1)
-	else:
-		print('Logged in with custom key')
-else:
-	print('Logged in with master key')
-
-# Avalon livestream permlink
-if len(args.link) < 1 or len(args.link) > 50:
-	print('Invalid livestream permlink')
-	sys.exit(1)
-else:
-	avalon_live_post = requests.get(avalon_api + '/content/' + avalon_user + '/' + args.link)
-	if avalon_live_post.status_code == 404:
-		print('Livestream not found')
-		sys.exit(1)
-	elif avalon_live_post.status_code != 200:
-		print('Error querying livestream with status code ' + avalon_live_post.status_code)
-		sys.exit(1)
-	else:
-		print('Found livestream ' + args.link)
-avalon_livestream_link = args.link
-
-# Authenticate with upload endpoint
-if args.endpoint:
-	upload_endpoint = args.endpoint
-elif args.ipfs_api:
-	is_ipfs_api = True
-	ipfs_api = ipfshttpclient.connect(args.ipfs_api)
-	upload_endpoint = None
-else:
-	upload_endpoint = config.ipfs_upload_endpoint
-
-access_token = upload_endpoint_auth()
-
-if access_token == False:
-	print('Upload endpoint authentication failed')
-	sys.exit(1)
-
-worker()
+		pk = secp256k1.PrivateKey(base58.b58decode(self.instance.private_key))
+		hexhash = bytes.fromhex(tx['hash'])
+		sign = pk.ecdsa_sign(hexhash,raw=True,digest=hashlib.sha256)
+		signature = base58.b58encode(pk.ecdsa_serialize_compact(sign)).decode('UTF-8')
+		tx['signature'] = signature
+		headers = {
+			'Accept': 'application/json, text/plain, */*',
+			'Content-Type': 'application/json'
+		}
+		broadcast = requests.post(self.instance.api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
+		if broadcast.status_code == 200:
+			return True
+		else:
+			try:
+				err = broadcast.json()
+				logging.error(err['error'])
+			except Exception as e:
+				logging.error('Broadcast error: ' + e)
+			logging.error('Transaction: ' + json.dumps(tx))
+			return False

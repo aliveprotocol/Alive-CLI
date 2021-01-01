@@ -12,3 +12,6 @@ skynet_upload_portals = [
 authenticated_ipfs_upload_endpoints = [
     "http://localhost:3000"
 ]
+
+valid_protocols = ['IPFS','Skynet']
+valid_networks = ['dtc','hive']
