@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import re
 import argparse
-import config
+import constants
 import logging
 import sys
 import os
@@ -116,10 +116,10 @@ class AliveInstance:
 		"""
 		Validates each value passed in AliveInstance and performs neccessary authentication.
 		"""
-		if self.protocol not in config.valid_protocols:
+		if self.protocol not in constants.valid_protocols:
 			raise ValueError('Invalid P2P protocol. Valid values are IPFS and Skynet.')
 
-		if self.network not in config.valid_networks:
+		if self.network not in constants.valid_networks:
 			raise ValueError('Invalid network. Valid values are dtc and hive.')
 
 		# Init record folder
@@ -171,7 +171,7 @@ class AliveInstance:
 			raise ValueError('Link must only contain letters, digits, dashes and underscores')
 
 	def __upload_endpoint_auth__(self) -> str:
-		if self.protocol == 'IPFS' and self.upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+		if self.protocol == 'IPFS' and self.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
 			loginUrl = self.upload_endpoint + '/login?user=' + self.username + '&network=' + self.network
 			if self.network == 'dtc' and self.custom_keyid != None:
 				loginUrl += '&dtckeyid=' + self.custom_keyid
@@ -289,7 +289,7 @@ class AliveDaemon:
 			# upload and retry if fails with backup portals
 			skylink = False
 			if self.instance.protocol == 'Skynet':
-				for upload_portal in config.skynet_upload_portals:
+				for upload_portal in constants.skynet_upload_portals:
 					skylink = self.skynet_push(filePath, upload_portal)
 					if skylink != False:
 						break
@@ -376,7 +376,7 @@ class AliveDaemon:
 
 	def ipfs_push(self,filePath):
 		# TODO: Multiple upload endpoints
-		if self.instance.upload_endpoint in config.authenticated_ipfs_upload_endpoints:
+		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
 			fileToUpload = {'chunk': open(filePath,'rb')}
 			postUrl = self.instance.upload_endpoint + '/uploadStream?access_token=' + self.instance.access_token
 			upload = requests.post(postUrl,files=fileToUpload)
