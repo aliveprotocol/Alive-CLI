@@ -19,6 +19,8 @@ import secp256k1
 import hashlib
 import ipfshttpclient
 import decrypt
+from beem import Hive
+from beemgraphenebase import account
 
 def touchDir(dir, strict = False):
 	if (strict == True and os.path.isdir(dir)):
@@ -151,10 +153,28 @@ class AliveInstance:
 				self.custom_keyid = None
 				print('Logged in with master key')
 		elif self.network == 'hive':
-			raise NotImplementedError('Alive Protocol coming soon to Hive...')
+			hive_pubkey = account.PrivateKey(wif=self.private_key,prefix='TST').get_public_key()
+			valid_key = False
+			hive_accreq = {
+				'jsonrpc': '2.0',
+				'id': 1,
+				'method': 'condenser_api.get_accounts',
+				'params': [[self.username]]
+			}
+			# support posting authorities from other accounts?
+			hive_acckeys = requests.post(self.api,json=hive_accreq).json()['result'][0]['posting']
+			for i in range(len(hive_acckeys['key_auths'])):
+				if hive_acckeys['key_auths'][i][0] == str(hive_pubkey):
+					valid_key = True
+					break
+			if valid_key != True:
+				raise RuntimeError('Invalid Hive private posting key')
+			self.graphene_client = Hive(node=self.api,keys=[self.private_key])
 
 		# Validate link
 		self.__link_validator__(self.link)
+
+		# TODO: Check if stream has ended already?
 
 		# Upload endpoint authentication
 		self.access_token = self.__upload_endpoint_auth__()
@@ -344,8 +364,11 @@ class AliveDaemon:
 		link = self.filearr[fileId].skylink
 		length = self.filearr[fileId].length
 		
-		# TODO: Hive Custom JSONs
-		broadcast_stream = self.push_stream_avalon(link,length)
+		broadcast_stream = None
+		if self.instance.network == 'dtc':
+			broadcast_stream = self.push_stream_avalon(link,length)
+		elif self.instance.network == 'hive':
+			broadcast_stream = self.push_stream_graphene(link,length)
 
 		if broadcast_stream != True:
 			logging.error('Failed to push stream to avalon')
@@ -425,4 +448,18 @@ class AliveDaemon:
 			except Exception as e:
 				logging.error('Broadcast error: ' + e)
 			logging.error('Transaction: ' + json.dumps(tx))
+			return False
+
+	def push_stream_graphene(self,hash,len):
+		json_data = {
+			'op': 0,
+			'link': self.instance.link,
+			'chunks': [{ 'len': len, 'src': hash }]
+		}
+		try:
+			self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
+			return True
+		except Exception as e:
+			logging.error('Broadcast error: ' + e)
+			logging.error('Custom JSON: ' + json.dumps(json_data))
 			return False
