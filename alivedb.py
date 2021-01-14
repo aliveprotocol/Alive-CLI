@@ -8,7 +8,7 @@ default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 
 def alivedb_install(alivedir: str = default_data_dir) -> None:
     """
-    Clones AliveDB repository and installs npm dependencies
+    Clones AliveDB repository and installs npm dependencies.
     """
     # TODO: Download NodeJS and npm if not available?
     if os.system('node -v') > 0 or os.system('npm -v') > 0:
@@ -21,7 +21,7 @@ def alivedb_install(alivedir: str = default_data_dir) -> None:
 
 class AliveDB:
     """
-    Main AliveDB daemon class
+    Main AliveDB daemon class.
     """
     recent_streams = []
 
@@ -43,7 +43,7 @@ class AliveDB:
 
     def start(self) -> None:
         """
-        Starts AliveDB daemon
+        Starts AliveDB daemon.
         """
         # TODO Check AliveDB installation
         os.chdir(self.alivedir)
@@ -57,7 +57,7 @@ class AliveDB:
 
     def stop(self) -> None:
         """
-        Sends SIGINT to AliveDB daemon
+        Sends SIGINT to AliveDB daemon.
         """
         assert self.process is not None, 'AliveDB is not running'
         os.kill(self.process.pid,signal.SIGINT)
@@ -65,6 +65,9 @@ class AliveDB:
         self.process = None
 
     def create_user(self, id: str, key: str) -> None:
+        """
+        Create AliveDB user.
+        """
         json = {
             'id': id,
             'key': key
@@ -79,6 +82,9 @@ class AliveDB:
             print(r.json()['error'])
 
     def login(self, key: str, id: str = '', pub: str = '') -> None:
+        """
+        Login with AliveDB user ID or public key (one of which must not be blank) and key.
+        """
         if len(id) == 0 and len(pub) == 0:
             raise ValueError('User ID or public key is required')
         json = { 'key': key }
@@ -99,6 +105,9 @@ class AliveDB:
             print(r.json()['error'])
 
     def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> None:
+        """
+        Push new stream to AliveDB.
+        """
         if network != 'dtc' and network != 'hive':
             raise ValueError('Network must be dtc or hive')
         new_stream = {
@@ -117,3 +126,11 @@ class AliveDB:
         else:
             # TODO: Proper error handling
             print(r.json()['error'])
+
+    def pop_recent_streams(self) -> list:
+        """
+        Pops recently pushed streams and returns it.
+        """
+        streams = self.recent_streams
+        self.recent_streams = []
+        return streams
