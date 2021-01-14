@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import signal
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 
@@ -27,6 +28,7 @@ class AliveDB:
         :http_port: Port number or unix socket to bind to
         :gun_port: GunDB P2P port to bind to
         """
+        self.process = None
         self.alivedir = alivedir
         self.peers = peers
 
@@ -38,6 +40,9 @@ class AliveDB:
         self.gun_port = gun_port
 
     def start(self):
+        """
+        Starts AliveDB daemon
+        """
         # TODO Check AliveDB installation
         os.chdir(self.alivedir)
         cmd = ['node','src/index.js']
@@ -47,3 +52,11 @@ class AliveDB:
         if self.gun_port is not None:
             cmd.append('--gun_port='+str(self.gun_port))
         self.process = subprocess.Popen(cmd)
+
+    def stop(self):
+        """
+        Sends SIGINT to AliveDB daemon
+        """
+        assert self.process is not None, 'AliveDB is not running'
+        os.kill(self.process.pid,signal.SIGINT)
+        self.process = None
