@@ -2,10 +2,11 @@ import os
 import sys
 import subprocess
 import signal
+import requests_unixsocket
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 
-def alivedb_install(alivedir: str = default_data_dir):
+def alivedb_install(alivedir: str = default_data_dir) -> None:
     """
     Clones AliveDB repository and installs npm dependencies
     """
@@ -19,27 +20,28 @@ def alivedb_install(alivedir: str = default_data_dir):
     os.system('npm i')
 
 class AliveDB:
-    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], http_port = None, gun_port = None):
+    """
+    Main AliveDB daemon class
+    """
+    recent_streams = []
+
+    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None) -> None:
         """
         Instantiates an AliveDB instance.
 
         :alivedir: AliveDB working directory for databases etc.
         :peers: List of GunDB P2P endpoints
-        :http_port: Port number or unix socket to bind to
         :gun_port: GunDB P2P port to bind to
         """
         self.process = None
         self.alivedir = alivedir
         self.peers = peers
-
-        if http_port is None:
-            self.http_port = alivedir + '/alivedb.sock'
-        else:
-            self.http_port = http_port
-
         self.gun_port = gun_port
+        self.socket = alivedir + '/alivedb.sock'
+        self.socketurl = 'http+unix://'+('%2F'.join(self.socket.split('/')))
+        self.session = requests_unixsocket.Session()
 
-    def start(self):
+    def start(self) -> None:
         """
         Starts AliveDB daemon
         """
@@ -48,15 +50,70 @@ class AliveDB:
         cmd = ['node','src/index.js']
         if len(self.peers) > 0:
             cmd.append('--peers='+str(self.peers))
-        cmd.append('--http_port='+str(self.http_port))
+        cmd.append('--http_port='+str(self.socket))
         if self.gun_port is not None:
             cmd.append('--gun_port='+str(self.gun_port))
         self.process = subprocess.Popen(cmd)
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Sends SIGINT to AliveDB daemon
         """
         assert self.process is not None, 'AliveDB is not running'
         os.kill(self.process.pid,signal.SIGINT)
+        os.remove(self.alivedir+'/alivedb.sock')
         self.process = None
+
+    def create_user(self, id: str, key: str) -> None:
+        json = {
+            'id': id,
+            'key': key
+        }
+        r = self.session.post(self.socketurl+'/createUser',json=json)
+        if r.status_code == 200:
+            self.userid = r.json()['id']
+            self.userpub = r.json()['pub']
+            self.userkey = key
+        else:
+            # TODO: Proper error handling. Raise exception?
+            print(r.json()['error'])
+
+    def login(self, key: str, id: str = '', pub: str = '') -> None:
+        if len(id) == 0 and len(pub) == 0:
+            raise ValueError('User ID or public key is required')
+        json = { 'key': key }
+        if len(id) > 0:
+            json['id'] = id
+        elif len(pub) > 0:
+            json['pub'] = pub
+        else:
+            raise AssertionError
+        r = self.session.post(self.socketurl+'/loginUser',json=json)
+        if r.status_code == 200:
+            r = self.session.get(self.socketurl+'/currentUser')
+            self.userid = r.json()['alias']
+            self.userpub = r.json()['pub']
+            self.userkey = key
+        else:
+            # TODO: Proper error handling
+            print(r.json()['error'])
+
+    def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> None:
+        if network != 'dtc' and network != 'hive':
+            raise ValueError('Network must be dtc or hive')
+        new_stream = {
+            'src': src,
+            'len': length
+        }
+        json = {
+            'network': network,
+            'streamer': streamer,
+            'link': link,
+            'stream': new_stream
+        }
+        r = self.session.post(self.socketurl+'/pushStream',json=json)
+        if r.status_code == 200:
+            self.recent_streams.append(new_stream)
+        else:
+            # TODO: Proper error handling
+            print(r.json()['error'])
