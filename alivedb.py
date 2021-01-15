@@ -3,6 +3,7 @@ import sys
 import subprocess
 import signal
 import requests_unixsocket
+import time
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 
@@ -23,7 +24,12 @@ class AliveDB:
     """
     Main AliveDB daemon class.
     """
-    recent_streams = []
+    recent_hashes = []
+    recent_lengths = []
+    last_pop_ts = time.time()
+    userid = None
+    userpub = None
+    userkey = None
 
     def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None) -> None:
         """
@@ -108,13 +114,18 @@ class AliveDB:
             # TODO: Proper error handling
             print(r.json()['error'])
 
-    def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> None:
+    def is_logged_in(self) -> bool:
+        """
+        Checks if current AliveDB instance is logged in.
+        """
+        return self.userid is not None and self.userkey is not None and self.userpub is not None
+
+    def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> bool:
         """
         Push new stream to AliveDB.
         """
         assert self.process is not None, 'AliveDB is not running'
-        if network != 'dtc' and network != 'hive':
-            raise ValueError('Network must be dtc or hive')
+        assert network == 'dtc' or network == 'hive', 'Network must be dtc or hive'
         new_stream = {
             'src': src,
             'len': length
@@ -127,15 +138,20 @@ class AliveDB:
         }
         r = self.session.post(self.socketurl+'/pushStream',json=json)
         if r.status_code == 200:
-            self.recent_streams.append(new_stream)
+            self.recent_hashes.append(src)
+            self.recent_lengths.append(length)
+            return True
         else:
             # TODO: Proper error handling
             print(r.json()['error'])
+            return False
 
-    def pop_recent_streams(self) -> list:
+    def pop_recent_streams(self) -> tuple:
         """
         Pops recently pushed streams and returns it.
         """
-        streams = self.recent_streams
-        self.recent_streams = []
+        streams = (self.recent_hashes, self.recent_lengths)
+        self.recent_hashes = []
+        self.recent_lengths = []
+        self.last_pop_ts = time.time()
         return streams

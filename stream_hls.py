@@ -228,15 +228,17 @@ class AliveDaemon:
 	"""
 	Main daemon for Alive streams.
 	"""
+	alivedb_batch_interval = 300 # 5 minutes
 	concurrent_uploads = 0
 	nextStreamFilename = 0
 	stream_filename = ''
 
 	def __init__(self, instance: AliveInstance, alivedb_instance: AliveDB = None):
 		"""
-		Instantiates Alive stream daemon. AliveDB instance must be running.
+		Instantiates Alive stream daemon. AliveDB instance must be running and logged in.
 		"""
 		assert alivedb_instance.process is not None, 'AliveDB is not running'
+		assert alivedb_instance.is_logged_in(), 'AliveDB is not logged in'
 		# Setup instance
 		self.instance = instance
 		self.alivedb_instance = alivedb_instance
@@ -367,17 +369,24 @@ class AliveDaemon:
 	def share(self,fileId):
 		self.filearr[fileId].status = 'sharing'
 
-		link = self.filearr[fileId].skylink
-		length = self.filearr[fileId].length
-		
+		link = [self.filearr[fileId].skylink]
+		length = [round(self.filearr[fileId].length,3)]
+
 		broadcast_stream = None
-		if self.instance.network == 'dtc':
+		should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.alivedb_batch_interval
+
+		if should_push_to_chains == False:
+			broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link,length)
+		elif self.alivedb_instance is not None and should_push_to_chains:
+			link, length = self.alivedb_instance.pop_recent_streams()
+
+		if self.instance.network == 'dtc' and should_push_to_chains:
 			broadcast_stream = self.push_stream_avalon(link,length)
-		elif self.instance.network == 'hive':
+		elif self.instance.network == 'hive' and should_push_to_chains:
 			broadcast_stream = self.push_stream_graphene(link,length)
 
 		if broadcast_stream != True:
-			logging.error('Failed to push stream to avalon')
+			logging.error('Failed to push stream')
 			self.filearr[fileId].status = 'share failed'
 			return False
 		else:
@@ -419,15 +428,13 @@ class AliveDaemon:
 			ipfs_add = self.instance.ipfs_api.add(filePath,trickle=True)
 			return ipfs_add['Hash']
 
-	def push_stream_avalon(self,hash,len):
+	def push_stream_avalon(self, hashes: list, lengths: list) -> bool:
 		tx = {
 			'type': 19,
 			'data': {
 				'link': self.instance.link,
-				'len': [len],
-				'hash': {
-					'src': [hash]
-				}
+				'len': lengths,
+				'src': hashes
 			},
 			'sender': self.instance.username,
 			'ts': round(time.time() * 1000)
@@ -456,11 +463,12 @@ class AliveDaemon:
 			logging.error('Transaction: ' + json.dumps(tx))
 			return False
 
-	def push_stream_graphene(self,hash,len):
+	def push_stream_graphene(self, hashes: list, lengths: list) -> bool:
 		json_data = {
 			'op': 0,
 			'link': self.instance.link,
-			'chunks': [{ 'len': len, 'src': hash }]
+			'len': lengths,
+			'src': hashes
 		}
 		try:
 			self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
