@@ -46,6 +46,8 @@ class AliveDB:
         Starts AliveDB daemon.
         """
         # TODO Check AliveDB installation
+        if self.process is not None:
+            return
         os.chdir(self.alivedir)
         cmd = ['node','src/index.js']
         if len(self.peers) > 0:
@@ -68,6 +70,7 @@ class AliveDB:
         """
         Create AliveDB user.
         """
+        assert self.process is not None, 'AliveDB is not running'
         json = {
             'id': id,
             'key': key
@@ -85,6 +88,7 @@ class AliveDB:
         """
         Login with AliveDB user ID or public key (one of which must not be blank) and key.
         """
+        assert self.process is not None, 'AliveDB is not running'
         if len(id) == 0 and len(pub) == 0:
             raise ValueError('User ID or public key is required')
         json = { 'key': key }
@@ -108,6 +112,7 @@ class AliveDB:
         """
         Push new stream to AliveDB.
         """
+        assert self.process is not None, 'AliveDB is not running'
         if network != 'dtc' and network != 'hive':
             raise ValueError('Network must be dtc or hive')
         new_stream = {

@@ -21,6 +21,7 @@ import ipfshttpclient
 import decrypt
 from beem import Hive
 from beemgraphenebase import account
+from alivedb import AliveDB
 
 def touchDir(dir, strict = False):
 	if (strict == True and os.path.isdir(dir)):
@@ -231,9 +232,14 @@ class AliveDaemon:
 	nextStreamFilename = 0
 	stream_filename = ''
 
-	def __init__(self, instance: AliveInstance):
+	def __init__(self, instance: AliveInstance, alivedb_instance: AliveDB = None):
+		"""
+		Instantiates Alive stream daemon. AliveDB instance must be running.
+		"""
+		assert alivedb_instance.process is not None, 'AliveDB is not running'
 		# Setup instance
 		self.instance = instance
+		self.alivedb_instance = alivedb_instance
 		touchDir(self.instance.data_dir)
 
 		self.filearr = [VideoFile(self.nextStreamFilename)]
