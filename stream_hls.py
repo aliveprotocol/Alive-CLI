@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 import re
-import argparse
 import constants
 import logging
-import sys
 import os
 import glob
 from cv2 import cv2
@@ -474,6 +472,6 @@ class AliveDaemon:
 			self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
 			return True
 		except Exception as e:
-			logging.error('Broadcast error: ' + e)
+			logging.error('Broadcast error: ' + str(e))
 			logging.error('Custom JSON: ' + json.dumps(json_data))
 			return False
