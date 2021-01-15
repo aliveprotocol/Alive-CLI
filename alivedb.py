@@ -47,6 +47,9 @@ class AliveDB:
         self.socketurl = 'http+unix://'+('%2F'.join(self.socket.split('/')))
         self.session = requests_unixsocket.Session()
 
+        if os.path.exists(self.socket):
+            os.remove(self.socket)
+
         # Stop AliveDB on SIGINT or SIGTERM
         signal.signal(signal.SIGINT, self.sigint_handler)
         signal.signal(signal.SIGTERM, self.sigint_handler)

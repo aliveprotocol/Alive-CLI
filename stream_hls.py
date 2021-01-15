@@ -373,9 +373,9 @@ class AliveDaemon:
 		broadcast_stream = None
 		should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.alivedb_batch_interval
 
-		if should_push_to_chains == False:
-			broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link,length)
-		elif self.alivedb_instance is not None and should_push_to_chains:
+		if self.alivedb_instance is not None:
+			broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])
+		if self.alivedb_instance is not None and should_push_to_chains:
 			link, length = self.alivedb_instance.pop_recent_streams()
 
 		if self.instance.network == 'dtc' and should_push_to_chains:
