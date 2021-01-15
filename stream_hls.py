@@ -3,6 +3,7 @@ import re
 import constants
 import logging
 import os
+import sys
 import glob
 from cv2 import cv2
 import requests
@@ -230,6 +231,7 @@ class AliveDaemon:
 	concurrent_uploads = 0
 	nextStreamFilename = 0
 	stream_filename = ''
+	is_running = False
 
 	def __init__(self, instance: AliveInstance, alivedb_instance: AliveDB = None):
 		"""
@@ -288,10 +290,11 @@ class AliveDaemon:
 					# Start uplaoding
 					break
 
+		self.is_running = True
 		self.stream_filename = os.path.basename(latest_m3u8).replace('.m3u8', '')
 
 		Thread(target=self.share_thread).start()
-		while True:
+		while self.is_running:
 			nextFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename) + ".ts")
 			nextAfterFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename + 1) + ".ts")
 			updateDisplay(self.filearr, symbols)
@@ -304,6 +307,30 @@ class AliveDaemon:
 				self.nextStreamFilename += 1
 			else:
 				time.sleep(1)
+
+	def stop_worker(self) -> None:
+		print('Stopping Alive daemon...')
+		self.is_running = False
+		
+		# Push all remaining AliveDB stream data to blockchains if any
+		if self.alivedb_instance is not None:
+			hashes, lengths = self.alivedb_instance.pop_recent_streams()
+			if len(hashes) > 0 and len(lengths) > 0:
+				print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
+				if self.instance.network == 'dtc':
+					self.push_stream_avalon(hashes,lengths)
+				elif self.instance.network == 'hive':
+					self.push_stream_graphene(hashes,lengths)
+			self.alivedb_instance.stop()
+
+		print('Alive daemon stopped successfully')
+
+	def sigint_handler(self, signal_received, frame) -> None:
+		"""
+		Stops Alive daemon when SIGINT or SIGTERM received.
+		"""
+		self.stop_worker()
+		sys.exit(0)
 
 	def upload(self, filePath, fileId, length):
 		start_time = time.time()
@@ -354,8 +381,7 @@ class AliveDaemon:
 
 	def share_thread(self):
 		lastSharedFileId = -1
-		# check_share_queue(check_share_queue, filearr)
-		while True:
+		while self.is_running:
 			nextToShare = lastSharedFileId + 1
 			if self.filearr[nextToShare].status == 'share queued' or self.filearr[nextToShare].status == 'share failed':
 				if self.share(nextToShare) == True:

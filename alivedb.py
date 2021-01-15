@@ -50,10 +50,6 @@ class AliveDB:
         if os.path.exists(self.socket):
             os.remove(self.socket)
 
-        # Stop AliveDB on SIGINT or SIGTERM
-        signal.signal(signal.SIGINT, self.sigint_handler)
-        signal.signal(signal.SIGTERM, self.sigint_handler)
-
     def start(self) -> None:
         """
         Starts AliveDB daemon.
@@ -69,6 +65,7 @@ class AliveDB:
         if self.gun_port is not None:
             cmd.append('--gun_port='+str(self.gun_port))
         self.process = subprocess.Popen(cmd)
+        time.sleep(2)
 
     def stop(self) -> None:
         """
@@ -78,13 +75,6 @@ class AliveDB:
         os.kill(self.process.pid,signal.SIGINT)
         os.remove(self.alivedir+'/alivedb.sock')
         self.process = None
-
-    def sigint_handler(self, signal_received, frame) -> None:
-        """
-        Stops AliveDB daemon when SIGINT or SIGTERM received.
-        """
-        self.stop()
-        sys.exit(0)
 
     def create_user(self, id: str, key: str) -> None:
         """
