@@ -29,9 +29,9 @@ required_args.add_argument('-k','--key', help='Private key (Avalon custom key mu
 required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True, metavar='', default=argparse.SUPPRESS)
 
 alivedb_args = parser.add_argument_group('AliveDB arguments')
-alivedb_args.add_argument('-gu','--alivedb_user', help='AliveDB user ID', metavar='', default=argparse.SUPPRESS)
-alivedb_args.add_argument('-gpuk','--alivedb_public_key', help='AliveDB public key (if no user ID)', metavar='', default=argparse.SUPPRESS)
-alivedb_args.add_argument('-gk','--alivedb_key', help='AliveDB user key', metavar='', default=argparse.SUPPRESS)
+alivedb_args.add_argument('-gu','--alivedb_user', help='AliveDB user ID', metavar='', default=None)
+alivedb_args.add_argument('-gpuk','--alivedb_public_key', help='AliveDB public key (if no user ID)', metavar='', default=None)
+alivedb_args.add_argument('-gk','--alivedb_key', help='AliveDB user key', metavar='', default=None)
 alivedb_args.add_argument('-gp','--alivedb_peers', help='AliveDB peer list (comma separated)', metavar='', default=argparse.SUPPRESS)
 
 args = parser.parse_args()
@@ -46,6 +46,8 @@ alivedb_instance = None
 if args.alivedb:
     if args.alivedb_user is None and args.alivedb_public_key is None:
         parser.error('Either AliveDB user ID or public key must be present')
+    if args.alivedb_key is None:
+        parser.error('AliveDB user key is missing')
     alivedb_instance = AliveDB(alivedir=args.data_dir+'/AliveDB', peers=args.alivedb_peers)
     alivedb_instance.start()
     if args.alivedb_user is not None:
