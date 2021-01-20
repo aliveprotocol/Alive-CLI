@@ -19,6 +19,7 @@ import hashlib
 import ipfshttpclient
 import decrypt
 from beem import Hive
+from beem.memo import Memo
 from beemgraphenebase import account
 from alivedb import AliveDB
 
@@ -204,9 +205,10 @@ class AliveInstance:
 			encrypted_memo = auth_request.json()['encrypted_memo']
 			decrypted_memo = None
 			if self.network == 'dtc':
-				decrypt.ecies_decrypt(base58.b58decode(self.private_key),decrypt.js_to_py_encrypted(encrypted_memo))
+				decrypted_memo = decrypt.ecies_decrypt(base58.b58decode(self.private_key),decrypt.js_to_py_encrypted(encrypted_memo))
 			elif self.network == 'hive':
-				raise NotImplementedError('Alive Protocol coming soon to Hive...')
+				decrypted_memo = Memo(blockchain_instance=self.graphene_client).decrypt(encrypted_memo)
+				decrypted_memo = decrypted_memo[1:len(decrypted_memo)]
 
 			# Obtain access token
 			headers = { 'Content-Type': 'text/plain' }
