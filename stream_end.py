@@ -1,7 +1,7 @@
 import sys
 
 if len(sys.argv) != 6:
-    print('Usage: ' + sys.argv[0] + ' <network> <avalon_api_node> <link> <username> <private_key>')
+    print('Usage: ' + sys.argv[0] + ' <network> <api_node> <link> <username> <private_key>')
     sys.exit(0)
 
 api = sys.argv[2]
