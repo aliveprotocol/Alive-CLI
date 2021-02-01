@@ -1,99 +1,112 @@
-# Skylive
+# Alive-CLI
 
-Live HLS video streams hosted on Skynet. SkyLive is under heavy development, streaming will be much more easyer in some weeks for non-tech users.
+Core Alive daemon and CLI tool for publishing HLS streams to decentralized networks.
 
-[Check out our roadmap](https://github.com/DaWe35/SkyLive/projects/3)
+This is the main daemon that is used by streamers to upload .ts chunks of a local HLS stream to IPFS or Skynet and publishes its hash and duration to decentralized networks.
 
-Explore streams: https://skylive.coolhd.hu
+## Pre-requisites
 
-# How to start stream
+Python 3.7+, `pip3` package manager and AliveDB dependencies are required.
 
-- Download & extract the latest binaries from [releases](https://github.com/DaWe35/SkyLive/releases)
+Additionally, the following packages are required for its dependency packages to be installed successfully:
 
-- Register a SkyLive account and scheule a new stream.
+### Debian/Ubuntu
 
-- Open command prompt and start the uploader with this command: `"C:\\path\to\stream_hls.exe" --record_folder "C:\\path\to\record_here"`
+```
+sudo apt-get install build-essential libssl-dev python3-dev python3-pip python3-setuptools
+```
 
-- Enter the generated stream token from https://SkyLive.coolhd.hu/studio
+### Fedora/CentOS
 
-- Setup OBS (below) and start recording into the 'record_here' folder!
+```
+sudo yum install gcc openssl-devel python-devel
+```
 
-# How to finish the stream
+### macOS
 
-- Click Stop recording in OBS
+```
+brew install openssl
+export CFLAGS="-I$(brew --prefix openssl)/include $CFLAGS"
+export LDFLAGS="-L$(brew --prefix openssl)/lib $LDFLAGS"
+```
 
-- Wait for every segment uploaded
+### Termux on Android
 
-- Close stream_hls.exe
+```
+pkg install clang openssl python
+```
 
-- Open https://SkyLive.coolhd.hu/studio and `Finish` the stream (after this, it will be seekable)
+You may also want to install IPFS or Sia node for uploading .ts chunks to your local repo:
+* [go-ipfs](https://dist.ipfs.io/#go-ipfs)
+* [ipfs-desktop](https://github.com/ipfs-shipyard/ipfs-desktop/releases)
+* [siad](https://sia.tech/get-started)
 
-# Setup OBS:
+## Installation
 
-- Download & config OBS
+```
+git clone https://github.com/aliveprotocol/Alive-CLI
+cd Alive-CLI
+pip3 install -r requirements.txt
+python3 alivedb_install.py
+```
 
-  TL;DR: use the settings what you see below
-  
-  Currently, there is a [bug](https://github.com/obsproject/obs-studio/issues/2500) in OBS, so you can't record more than 14 chunks into m3u8 (tested on Win10 only). It is recommended to try it out on your system, maybe you can record more than 16 chunks (please write your experience [in a comment](https://github.com/obsproject/obs-studio/issues/2500). But while the issue is not fixed, we need to use the custom ffmpeg output:
-  
-  ![OBS settings](https://raw.githubusercontent.com/DaWe35/Skylive/master/docs/obs_settings.jpg)
+The default data directory is `~/.alive` where all Alive working files will be stored.
 
-    - Output mode: *Advanced*
-    
-    - Type: *Custom output (FFmpeg)*
-    
-      *Without FFmpeg, the recording may be stuck after 14 or 33 chunks*
-    
-    - File path: *.../Skylive/record_here*
-    
-      *This is important, the python script will search for new files in 'record_here'*
-    
-    - Container format: *hls*
-    
-      *It records small .ts chunks, compatible with HTTP Live Streaming*
-    
-    - Muxer settings: *hls_time=10*
-    
-      *10 seconds chunks are acceptable - too large cause more delay, too small causes upload congestion.*
-      
-    - Video Encoder Settings: *preset=veryfast*
-    
-      *Saves the CPU. Available presets: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo*
-      
-      *Try out some, but be careful: if you see this warning, viewers will experience buffering*
-      
-      ![OBS recording overloaded](https://raw.githubusercontent.com/DaWe35/Skylive/master/docs/overload.jpg)
-    
-    - Under Settings -> Advanced -> Recording, change the Filename Formatting to `live` - that's enough (and important!)
-    
-      ![OBS filename](https://raw.githubusercontent.com/DaWe35/Skylive/master/docs/obs_filename.jpg)
+## Starting a new stream
 
-# Restream m3u8 from Youtube/Twitch
+Begin from step 3 if streaming directly on-chain.
 
-You can restream any public Youtube/Twitch stream to SkyLive without any transcoding or screen recording. The `stream_downloader.py` will download live stream on-demand, so you can re-upload it to SkyLive with `stream_hls.py`.
+1. If not already, create an AliveDB user account.
+```
+python3 alivedb_usercreate.py <new_alivedb_password>
+```
 
-Usage: 
+2. Publish your AliveDB public key to your new stream.
 
-`cd C:\\path\to\SkyLive`
+**Avalon**
+```
+python3 stream_configure.py dtc <avalon_api_node> <link> <alivedb_pubkey> <username> <private_key>
+```
 
-Start downloader:
+**Hive**
+```
+python3 stream_configure.py hive <hive_api_node> <link> <alivedb_pubkey> <username> <posting_key>
+```
 
-`stream_downloader.exe --url https://www.youtube.com/watch?v=kG5araSvvLI`
+3. Setup OBS recording output settings according to the config below.
 
-Start uploader:
+4. Start the Alive daemon. To get CLI usage info:
+```
+python3 alivecli.py -h
+```
 
-`"C:\\path\to\stream_hls.exe" --record_folder "C:\\path\to\team_restream_0"`
+5. Start recording in OBS.
 
-# Other tricks, notes
+## Ending a stream
 
-### Export HLS to mp4
+1. Stop recording in OBS.
+2. Let the final chunk to complete processing, then hit `Ctrl+C` on Alive daemon.
+3. Let the world know that the stream has ended so that the stream archive will be seekable.
 
-After the stream, you can easily convert the .ts chunks into one mp4 file:
+**Avalon**
+```
+python3 stream_end.py dtc <avalon_api_node> <link> <username> <private_key>
+```
 
-`ffmpeg -i "http://host/folder/input.m3u8" -bsf:a aac_adtstoasc -vcodec copy -c copy output.mp4`
+**Hive**
+```
+python3 stream_end.py hive <hive_api_node> <link> <username> <posting_key>
+```
 
-### Optional: setup you own playlist server
+## OBS Recording Output Config
 
-- Running a you-own SkyLive portal needs PHP and MySQL. On Windows, I recommend wamp.net. The root directory of the website needs to be the `server` folder.
-- Copy `server/config_default.php` to `server/config.php` and change the settings.
-- Import skylive.sql into MySQL.
+**ⓘ Important**
+Your recording output configuration must match the settings below. Failing to do so may result in failed uploads or excessive use of bandwidth or resource credits.
+
+- Output mode: **Advanced**
+- Type: **Custom output (FFmpeg)**
+- FFmpeg output type: **Output to File**
+- File path: `~/.alivedb/record_here`
+- Container format: **hls**
+- Muxer settings: **hls_time=10**
+- Keyframe interval: Set this to 10x your framerate. For example, if you're recording at 30fps, set this value to 300.
