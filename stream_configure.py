@@ -6,19 +6,21 @@ import base58
 import hashlib
 import secp256k1
 
-if len(sys.argv) != 5:
-    print('Usage: ' + sys.argv[0] + ' <avalon_api_node> <link> <username> <private_key>')
+if len(sys.argv) != 6:
+    print('Usage: ' + sys.argv[0] + ' <avalon_api_node> <link> <alivedb_pubkey> <username> <private_key>')
     sys.exit(0)
 
 api = sys.argv[1]
 link = sys.argv[2]
-sender = sys.argv[3]
-key = sys.argv[4]
+pub = sys.argv[3]
+sender = sys.argv[4]
+key = sys.argv[5]
 
 tx = {
-    'type': 20,
+    'type': 21,
     'data': {
-        'link': link
+        'link': link,
+        'pub': pub
     },
     'sender': sender,
     'ts': round(time.time() * 1000)
