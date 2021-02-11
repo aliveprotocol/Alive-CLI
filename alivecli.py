@@ -48,12 +48,19 @@ if args.alivedb:
         parser.error('Either AliveDB user ID or public key must be present')
     if args.alivedb_key is None:
         parser.error('AliveDB user key is missing')
-    alivedb_instance = AliveDB(alivedir=args.data_dir+'/AliveDB', peers=args.alivedb_peers)
+    alivedb_instance = AliveDB(
+        alivedir=args.data_dir+'/AliveDB',
+        peers=args.alivedb_peers,
+        network=args.network,
+        username=args.username,
+        link=args.link
+    )
     alivedb_instance.start()
     if args.alivedb_user is not None:
         alivedb_instance.login(key=args.alivedb_key, id=args.alivedb_user)
     elif args.alivedb_public_key is not None:
         alivedb_instance.login(key=args.alivedb_key, pub=args.alivedb_public_key)
+    alivedb_instance.fetch_participants_keys()
 
 alive_instance = AliveInstance(
     protocol=args.protocol,

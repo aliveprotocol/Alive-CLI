@@ -31,7 +31,7 @@ class AliveDB:
     userpub = None
     userkey = None
 
-    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None) -> None:
+    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, network: str = '', username: str = '', link: str = '') -> None:
         """
         Instantiates an AliveDB instance.
 
@@ -50,6 +50,11 @@ class AliveDB:
         if os.path.exists(self.socket):
             os.remove(self.socket)
 
+        if network == '' or username == '' or link == '':
+            self.chat_listener = ''
+        else:
+            self.chat_listener = network+'/'+username+'/'+link
+
     def start(self) -> None:
         """
         Starts AliveDB daemon.
@@ -64,6 +69,8 @@ class AliveDB:
         cmd.append('--http_port='+str(self.socket))
         if self.gun_port is not None:
             cmd.append('--gun_port='+str(self.gun_port))
+        if self.chat_listener != '':
+            cmd.append('--chat_listener='+self.chat_listener)
         self.process = subprocess.Popen(cmd)
         time.sleep(2)
 
@@ -123,6 +130,10 @@ class AliveDB:
         Checks if current AliveDB instance is logged in.
         """
         return self.userid is not None and self.userkey is not None and self.userpub is not None
+
+    def fetch_participants_keys(self) -> None:
+        assert self.process is not None, 'AliveDB is not running'
+        self.session.get(self.socketurl+'/fetchParticipantsKeys')
 
     def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> bool:
         """
