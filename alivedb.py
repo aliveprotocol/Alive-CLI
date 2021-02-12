@@ -31,7 +31,7 @@ class AliveDB:
     userpub = None
     userkey = None
 
-    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, network: str = '', username: str = '', link: str = '') -> None:
+    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, chat_listener: str = '') -> None:
         """
         Instantiates an AliveDB instance.
 
@@ -43,17 +43,13 @@ class AliveDB:
         self.alivedir = alivedir
         self.peers = peers
         self.gun_port = gun_port
+        self.chat_listener = chat_listener
         self.socket = alivedir + '/alivedb.sock'
         self.socketurl = 'http+unix://'+('%2F'.join(self.socket.split('/')))
         self.session = requests_unixsocket.Session()
 
         if os.path.exists(self.socket):
             os.remove(self.socket)
-
-        if network == '' or username == '' or link == '':
-            self.chat_listener = ''
-        else:
-            self.chat_listener = network+'/'+username+'/'+link
 
     def start(self) -> None:
         """

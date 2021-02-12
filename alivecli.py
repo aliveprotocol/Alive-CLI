@@ -33,6 +33,7 @@ alivedb_args.add_argument('-gu','--alivedb_user', help='AliveDB user ID', metava
 alivedb_args.add_argument('-gpuk','--alivedb_public_key', help='AliveDB public key (if no user ID)', metavar='', default=None)
 alivedb_args.add_argument('-gk','--alivedb_key', help='AliveDB user key', metavar='', default=None)
 alivedb_args.add_argument('-gp','--alivedb_peers', help='AliveDB peer list (comma separated)', metavar='', default=argparse.SUPPRESS)
+alivedb_args.add_argument('-gmod','--alivedb_automod', help='AliveDB live chat automod', type=str2bool, metavar='', default=False)
 
 args = parser.parse_args()
 
@@ -48,12 +49,13 @@ if args.alivedb:
         parser.error('Either AliveDB user ID or public key must be present')
     if args.alivedb_key is None:
         parser.error('AliveDB user key is missing')
+    chat_listener = ''
+    if args.alivedb_automod is True:
+        chat_listener = args.network+'/'+args.username+'/'+args.link
     alivedb_instance = AliveDB(
         alivedir=args.data_dir+'/AliveDB',
         peers=args.alivedb_peers,
-        network=args.network,
-        username=args.username,
-        link=args.link
+        chat_listener=chat_listener
     )
     alivedb_instance.start()
     if args.alivedb_user is not None:
