@@ -2,7 +2,7 @@
 
 Core Alive daemon and CLI tool for publishing HLS streams to decentralized networks.
 
-This is the main daemon that is used by streamers to upload .ts chunks of a local HLS stream to IPFS or Skynet and publishes its hash and duration to decentralized networks.
+This is the main daemon that is used by streamers to upload .ts segments of a local HLS stream to IPFS or Skynet and publishes its hash and duration to decentralized networks.
 
 ## Pre-requisites
 
@@ -36,7 +36,7 @@ export LDFLAGS="-L$(brew --prefix openssl)/lib $LDFLAGS"
 pkg install clang openssl python
 ```
 
-You may also want to install IPFS or Sia node for uploading .ts chunks to your local repo:
+You may also want to install IPFS or Sia node for uploading .ts segments to your local repo:
 * [go-ipfs](https://dist.ipfs.io/#go-ipfs)
 * [ipfs-desktop](https://github.com/ipfs-shipyard/ipfs-desktop/releases)
 * [siad](https://sia.tech/get-started)
@@ -85,7 +85,7 @@ python3 alivecli.py -h
 ## Ending a stream
 
 1. Stop recording in OBS.
-2. Let the final chunk to complete processing, then hit `Ctrl+C` on Alive daemon.
+2. Let the final segment to complete processing, then hit `Ctrl+C` on Alive daemon.
 3. Let the world know that the stream has ended so that the stream archive will be seekable.
 
 **Avalon**
