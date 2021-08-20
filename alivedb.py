@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 import signal
 import requests_unixsocket
