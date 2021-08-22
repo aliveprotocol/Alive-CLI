@@ -317,12 +317,13 @@ class AliveDaemon:
 		# Push all remaining AliveDB stream data to blockchains if any
 		if self.alivedb_instance is not None:
 			hashes, lengths = self.alivedb_instance.pop_recent_streams()
+			chunk_hash = self.process_chunk(hashes,lengths)
 			if len(hashes) > 0 and len(lengths) > 0:
 				print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
 				if self.instance.network == 'dtc':
-					self.push_stream_avalon(hashes,lengths)
+					self.push_stream_avalon(chunk_hash)
 				elif self.instance.network == 'hive':
-					self.push_stream_graphene(hashes,lengths)
+					self.push_stream_graphene(chunk_hash)
 			self.alivedb_instance.stop()
 
 		print('Alive daemon stopped successfully')
@@ -405,11 +406,12 @@ class AliveDaemon:
 			broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])
 		if self.alivedb_instance is not None and should_push_to_chains:
 			link, length = self.alivedb_instance.pop_recent_streams()
+			chunk_hash = self.process_chunk(link,length)
 
 		if self.instance.network == 'dtc' and should_push_to_chains:
-			broadcast_stream = self.push_stream_avalon(link,length)
+			broadcast_stream = self.push_stream_avalon(chunk_hash)
 		elif self.instance.network == 'hive' and should_push_to_chains:
-			broadcast_stream = self.push_stream_graphene(link,length)
+			broadcast_stream = self.push_stream_graphene(chunk_hash)
 
 		if broadcast_stream != True:
 			logging.error('Failed to push stream')
@@ -418,6 +420,12 @@ class AliveDaemon:
 		else:
 			self.filearr[fileId].status = 'shared'
 			return True
+
+	def process_chunk(self, hashes: list, lengths: list):
+		if self.instance.protocol == 'Skynet':
+			return self.skynet_chunk(hashes, lengths)
+		elif self.instance.protocol == 'IPFS':
+			return self.ipfs_chunk(hashes,lengths)
 
 	def skynet_push(self,filePath, portal):
 		logging.debug('Uploading ' + str(filePath) + ' with ' + str(portal))
@@ -454,13 +462,29 @@ class AliveDaemon:
 			ipfs_add = self.instance.ipfs_api.add(filePath,trickle=True)
 			return ipfs_add['Hash']
 
-	def push_stream_avalon(self, hashes: list, lengths: list) -> bool:
+	def skynet_chunk(self, hashes: list, lengths: list) -> str:
+		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
+		raise NotImplementedError
+
+	def ipfs_chunk(self, hashes: list, lengths: list) -> str:
+		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
+		
+		csv_content = ''
+		for i in range(len(hashes)):
+			csv_content += hashes[i] + ',' + str(lengths[i])
+
+		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
+			raise NotImplementedError
+		else:
+			ipfs_add = self.instance.ipfs_api.add_str(csv_content)
+			return ipfs_add['Hash']
+
+	def push_stream_avalon(self, chunk_hash: str) -> bool:
 		tx = {
 			'type': 19,
 			'data': {
 				'link': self.instance.link,
-				'len': lengths,
-				'src': hashes
+				'src': chunk_hash
 			},
 			'sender': self.instance.username,
 			'ts': round(time.time() * 1000)
@@ -489,12 +513,11 @@ class AliveDaemon:
 			logging.error('Transaction: ' + json.dumps(tx))
 			return False
 
-	def push_stream_graphene(self, hashes: list, lengths: list) -> bool:
+	def push_stream_graphene(self, chunk_hash: str) -> bool:
 		json_data = {
 			'op': 0,
 			'link': self.instance.link,
-			'len': lengths,
-			'src': hashes
+			'src': chunk_hash
 		}
 		try:
 			self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
