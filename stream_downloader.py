@@ -19,7 +19,7 @@ def rmdir(dir):
 		shutil.rmtree(dir)
 
 # create temp folder
-projectPath = os.path.expanduser( os.path.join('~', '.SkyLive'))
+projectPath = os.path.expanduser( os.path.join('~', '.alive'))
 touchDir(projectPath)
 
 logFile = os.path.join(projectPath, "stream_downloader.log")

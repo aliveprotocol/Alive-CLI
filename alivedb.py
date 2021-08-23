@@ -67,7 +67,11 @@ class AliveDB:
         if self.chat_listener != '':
             cmd.append('--chat_listener='+self.chat_listener)
         self.process = subprocess.Popen(cmd)
-        time.sleep(2)
+        if self.gun_port is None:
+            while os.path.exists(self.socket) is False:
+                time.sleep(1)
+        else:
+            time.sleep(2)
 
     def stop(self) -> None:
         """

@@ -317,9 +317,9 @@ class AliveDaemon:
 		# Push all remaining AliveDB stream data to blockchains if any
 		if self.alivedb_instance is not None:
 			hashes, lengths = self.alivedb_instance.pop_recent_streams()
-			chunk_hash = self.process_chunk(hashes,lengths)
 			if len(hashes) > 0 and len(lengths) > 0:
 				print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
+				chunk_hash = self.process_chunk(hashes,lengths)
 				if self.instance.network == 'dtc':
 					self.push_stream_avalon(chunk_hash)
 				elif self.instance.network == 'hive':
@@ -499,15 +499,14 @@ class AliveDaemon:
 				logging.error('IPFS upload failed')
 				return ''
 		else:
-			ipfs_add = self.instance.ipfs_api.add_str(csv_content)
-			return ipfs_add['Hash']
+			return self.instance.ipfs_api.add_str(csv_content)
 
 	def csv_chunk(self, hashes: list, lengths: list) -> str:
 		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
 
 		csv_content = ''
 		for i in range(len(hashes)):
-			csv_content += hashes[i] + ',' + str(lengths[i])
+			csv_content += hashes[i] + ',' + str(lengths[i]) + '\n'
 
 		return csv_content
 
@@ -551,6 +550,7 @@ class AliveDaemon:
 			'link': self.instance.link,
 			'src': chunk_hash
 		}
+		logging.info('Broadcasting custom_json to Hive: ' + json.dumps(json_data))
 		try:
 			self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
 			return True
