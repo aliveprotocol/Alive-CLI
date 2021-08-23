@@ -407,6 +407,8 @@ class AliveDaemon:
 		if self.alivedb_instance is not None and should_push_to_chains:
 			link, length = self.alivedb_instance.pop_recent_streams()
 			chunk_hash = self.process_chunk(link,length)
+			if chunk_hash == '':
+				logging.error('failed to upload chunk')
 
 		if self.instance.network == 'dtc' and should_push_to_chains:
 			broadcast_stream = self.push_stream_avalon(chunk_hash)
@@ -449,7 +451,7 @@ class AliveDaemon:
 	def ipfs_push(self,filePath):
 		# TODO: Multiple upload endpoints
 		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
-			fileToUpload = {'chunk': open(filePath,'rb')}
+			fileToUpload = {'segment': open(filePath,'rb')}
 			postUrl = self.instance.upload_endpoint + '/uploadStream?access_token=' + self.instance.access_token
 			upload = requests.post(postUrl,files=fileToUpload)
 			if upload.status_code == 200:
@@ -464,20 +466,50 @@ class AliveDaemon:
 
 	def skynet_chunk(self, hashes: list, lengths: list) -> str:
 		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
-		raise NotImplementedError
+		
+		csv_content = self.csv_chunk(hashes,lengths)
+		csv_tmpfile = 'chunk_' + str(round(time.time()*1000))
+		f = open(csv_tmpfile,'x')
+		f.write(csv_content)
+		f.close()
+
+		try:
+			try:
+				sk = self.instance.skynet_api.upload_file(csv_tmpfile)
+				os.remove(csv_tmpfile)
+				return sk
+			except TimeoutError:
+				logging.error('Chunk upload timeout, filename: ' + csv_tmpfile)
+				return ''
+		except:
+			logging.error('Chunk upload failed, filename: ' + csv_tmpfile)
+			return ''
 
 	def ipfs_chunk(self, hashes: list, lengths: list) -> str:
 		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
 		
+		csv_content = self.csv_chunk(hashes,lengths)
+
+		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
+			postUrl = self.instance.upload_endpoint + '/uploadChunk?access_token=' + self.instance.access_token
+			upload = requests.post(postUrl,data=csv_content)
+			if upload.status_code == 200:
+				return json.loads(upload.text)['hash']
+			else:
+				logging.error('IPFS upload failed')
+				return ''
+		else:
+			ipfs_add = self.instance.ipfs_api.add_str(csv_content)
+			return ipfs_add['Hash']
+
+	def csv_chunk(self, hashes: list, lengths: list) -> str:
+		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
+
 		csv_content = ''
 		for i in range(len(hashes)):
 			csv_content += hashes[i] + ',' + str(lengths[i])
 
-		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
-			raise NotImplementedError
-		else:
-			ipfs_add = self.instance.ipfs_api.add_str(csv_content)
-			return ipfs_add['Hash']
+		return csv_content
 
 	def push_stream_avalon(self, chunk_hash: str) -> bool:
 		tx = {
