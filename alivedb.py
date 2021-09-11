@@ -3,21 +3,60 @@ import subprocess
 import signal
 import requests_unixsocket
 import time
+import hashlib
+from alivedb_integrity import integrity
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
+default_tag = 'master'
 
-def alivedb_install(alivedir: str = default_data_dir) -> None:
+def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) -> None:
     """
     Clones AliveDB repository and installs npm dependencies.
     """
-    # TODO: Download NodeJS and npm if not available?
-    if os.system('node -v') > 0 or os.system('npm -v') > 0:
-        raise RuntimeError('NodeJS and/or npm is not installed')
+    # TODO: Self-contained installation
+    alivedb_dependency_check()
     os.chdir(alivedir)
     # TODO: Download tagged zip source code?
     os.system('git clone https://github.com/techcoderx/AliveDB')
     os.chdir('AliveDB')
+    os.system('git checkout '+tag)
     os.system('npm i')
+
+def alivedb_dependency_check() -> bool:
+    """
+    Test NodeJS, npm and Git installation.
+    """
+    if os.system('node -v') > 0:
+        raise RuntimeError('NodeJS is not installed')
+    if os.system('npm -v') > 0:
+        raise RuntimeError('npm is not installed')
+    if os.system('git --version') > 0:
+        raise RuntimeError('Git is not installed')
+    return True
+
+def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, dependency_check: bool = False) -> bool:
+    """
+    Verifies the integrity of AliveDB installation.
+    """
+    if dependency_check:
+        try:
+            alivedb_dependency_check()
+        except RuntimeError:
+            return False
+    for f in integrity:
+        test_file = alivedir+'/AliveDB/'+f
+        if os.path.exists(test_file) is False:
+            return False
+        if dev_mode is False:
+            if os.path.getsize(test_file) != integrity[f]['s']:
+                return False
+            sha256_hash = hashlib.sha256()
+            with open(test_file,"rb") as opened_file:
+                for byte_block in iter(lambda: opened_file.read(4096),b""):
+                    sha256_hash.update(byte_block)
+                if sha256_hash.hexdigest() != integrity[f]['h']:
+                    return False
+    return True
 
 class AliveDB:
     """
