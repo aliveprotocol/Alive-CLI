@@ -1,6 +1,9 @@
 import os
+import sys
+import platform
 import subprocess
 import signal
+import requests
 import requests_unixsocket
 import time
 import hashlib
@@ -13,7 +16,6 @@ def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) ->
     """
     Clones AliveDB repository and installs npm dependencies.
     """
-    # TODO: Self-contained installation
     alivedb_dependency_check()
     os.chdir(alivedir)
     # TODO: Download tagged zip source code?
@@ -21,6 +23,17 @@ def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) ->
     os.chdir('AliveDB')
     os.system('git checkout '+tag)
     os.system('npm i')
+
+def alivedb_install_build(alivedir: str = default_data_dir) -> None:
+    """
+    Downloads self-contained pre-compiled AliveDB build
+    """
+    try:
+        integrity['build'][sys.platform+'-'+platform.machine()]
+    except KeyError:
+        raise RuntimeError('build unavailable')
+    d = requests.get(integrity['build'][sys.platform+'-'+platform.machine()]['l'],allow_redirects=True)
+    open(alivedir+'/alivedb','wb').write(d.content)
 
 def alivedb_dependency_check() -> bool:
     """
@@ -43,20 +56,51 @@ def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, 
             alivedb_dependency_check()
         except RuntimeError:
             return False
-    for f in integrity:
+    for f in integrity['source']:
         test_file = alivedir+'/AliveDB/'+f
         if os.path.exists(test_file) is False:
             return False
         if dev_mode is False:
-            if os.path.getsize(test_file) != integrity[f]['s']:
-                return False
             sha256_hash = hashlib.sha256()
             with open(test_file,"rb") as opened_file:
                 for byte_block in iter(lambda: opened_file.read(4096),b""):
                     sha256_hash.update(byte_block)
-                if sha256_hash.hexdigest() != integrity[f]['h']:
+                if sha256_hash.hexdigest() != integrity['source'][f]:
                     return False
     return True
+
+def alivedb_build_integrity(alivedir: str = default_data_dir, dev_mode: bool = False) -> bool:
+    """
+    Verifies the integrity of self-contained pre-compiled AliveDB installation.
+    """
+    try:
+        integrity['build'][sys.platform+'-'+platform.machine()]
+    except KeyError:
+        return False
+    filename = alivedir+'/alivedb'
+    if os.path.exists(filename) is False:
+        return False
+    if dev_mode is False:
+        sha256_hash = hashlib.sha256()
+        with open(filename,"rb") as opened_file:
+            for byte_block in iter(lambda: opened_file.read(4096),b""):
+                sha256_hash.update(byte_block)
+            if sha256_hash.hexdigest() != integrity['build'][sys.platform+'-'+platform.machine()]['h']:
+                return False
+    return True
+
+def alivedb_installation_check(alivedir: str = default_data_dir, dev_mode: bool = False):
+    """
+    Checks AliveDB installation and returns its type.
+
+    Returns 1 for precompiled build, 2 for source if build unavailable, 0 otherwise.
+    """
+    if alivedb_build_integrity(alivedir,dev_mode) is True:
+        return 1
+    elif alivedb_integrity(alivedir,dev_mode,True) is True:
+        return 2
+    else:
+        return 0
 
 class AliveDB:
     """
