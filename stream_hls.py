@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import re
-import constants
 import logging
 import os
 import sys
@@ -21,7 +20,13 @@ import decrypt
 from beem import Hive
 from beem.memo import Memo
 from beemgraphenebase import account
-from alivedb import AliveDB
+
+if '.' in __name__:
+	from . import constants
+	from .alivedb import AliveDB
+else:
+	import constants
+	from alivedb import AliveDB
 
 def touchDir(dir, strict = False):
 	if (strict == True and os.path.isdir(dir)):

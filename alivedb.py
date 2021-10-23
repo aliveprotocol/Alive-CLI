@@ -7,15 +7,28 @@ import requests
 import requests_unixsocket
 import time
 import hashlib
-from .alivedb_integrity import integrity
+
+if '.' in __name__:
+    from .alivedb_integrity import integrity
+else:
+    from alivedb_integrity import integrity
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 default_tag = 'master'
+
+def alivedb_setup_nvm() -> None:
+    """
+    Setup Node Version Manager for use in AliveDB.
+    """
+    nvm_dir = os.environ['HOME'] + '/.nvm'
+    os.system('[ -s "'+nvm_dir+'/nvm.sh" ] && \. "'+nvm_dir+'/nvm.sh"')
+    os.system('[ -s "'+nvm_dir+'/bash_completion" ] && \. "'+nvm_dir+'/bash_completion"')
 
 def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) -> None:
     """
     Clones AliveDB repository and installs npm dependencies.
     """
+    alivedb_setup_nvm()
     alivedb_dependency_check()
     os.chdir(alivedir)
     # TODO: Download tagged zip source code?
@@ -39,6 +52,7 @@ def alivedb_dependency_check() -> bool:
     """
     Test NodeJS, npm and Git installation.
     """
+    alivedb_setup_nvm()
     if os.system('node -v') > 0:
         raise RuntimeError('NodeJS is not installed')
     if os.system('npm -v') > 0:
