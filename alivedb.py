@@ -7,7 +7,7 @@ import requests
 import requests_unixsocket
 import time
 import hashlib
-from alivedb_integrity import integrity
+from .alivedb_integrity import integrity
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 default_tag = 'master'
