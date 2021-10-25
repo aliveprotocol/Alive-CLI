@@ -11,3 +11,5 @@ integrity = {
     'src/server.js': 'a1e0d54df6c5074cf1c76eb738f2207985028498a508878560218be4929cbcfe',
     'src/validator.js': '842460b872fc287983661ad537aecd1974d3c44febda9f9687a5c221676a38b8'
 }
+
+version = '1.0.0a'

@@ -3,6 +3,7 @@ import argparse
 import signal
 from stream_hls import AliveInstance, AliveDaemon
 from alivedb import AliveDB
+from alivedb_integrity import version as __version__
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -19,6 +20,7 @@ parser.add_argument('-d','--data_dir', help='Data directory for stream recording
 parser.add_argument('-f','--purge_files', type=str2bool, default=False, help='Purges .ts chunks after upload.', metavar='')
 parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams. Valid values: IPFS and Skynet.', metavar='', default='IPFS')
 parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint.', metavar='', default='/ip4/127.0.0.1/tcp/5001/http')
+parser.add_argument('-v','--version', help='Print the version', action='version', version=__version__)
 
 required_args = parser.add_argument_group('required arguments')
 required_args.add_argument('-n','--network', help='Network (valid values are dtc and hive)', required=True, metavar='', default=argparse.SUPPRESS)
