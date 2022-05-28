@@ -11,7 +11,7 @@ skynet_upload_portals = [
 
 # IPFS upload endpoints with authentication required
 authenticated_ipfs_upload_endpoints = [
-    'https://uploader.oneloved.tube',
+    'https://uploader.oneloveipfs.com',
     'http://localhost:3000'
 ]
 

@@ -26,7 +26,7 @@ required_args = parser.add_argument_group('required arguments')
 required_args.add_argument('-n','--network', help='Network (valid values are dtc and hive)', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-a','--api', help='API node URL', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-u','--user', help='Username', required=True, metavar='', default=argparse.SUPPRESS)
-required_args.add_argument('-k','--key', help='Private key (Avalon custom key must have PUSH_STREAM and END_STREAM permissions)', required=True, metavar='', default=argparse.SUPPRESS)
+required_args.add_argument('-k','--key', help='Private key (Avalon custom key must have PLAYLIST_JSON and PLAYLIST_PUSH permissions)', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True, metavar='', default=argparse.SUPPRESS)
 
 alivedb_args = parser.add_argument_group('AliveDB arguments')
@@ -51,7 +51,7 @@ if args.alivedb_key is None:
     parser.error('AliveDB user key is missing')
 chat_listener = ''
 if args.alivedb_automod is True:
-    chat_listener = args.network+'/'+args.username+'/'+args.link
+    chat_listener = args.network+'/'+args.user+'/'+args.link
 alivedb_instance = AliveDB(
     alivedir=args.data_dir+'/AliveDB',
     peers=args.alivedb_peers,

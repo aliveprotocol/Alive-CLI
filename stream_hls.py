@@ -315,7 +315,7 @@ class AliveDaemon:
 			else:
 				time.sleep(1)
 
-	def stop_worker(self) -> None:
+	def stop_worker(self, exit: bool) -> None:
 		print('Stopping Alive daemon...')
 		self.is_running = False
 		
@@ -332,13 +332,14 @@ class AliveDaemon:
 			self.alivedb_instance.stop()
 
 		print('Alive daemon stopped successfully')
+		if exit:
+			sys.exit(0)
 
 	def sigint_handler(self, signal_received, frame) -> None:
 		"""
 		Stops Alive daemon when SIGINT or SIGTERM received.
 		"""
-		self.stop_worker()
-		sys.exit(0)
+		self.stop_worker(True)
 
 	def upload(self, filePath, fileId, length):
 		start_time = time.time()
@@ -457,12 +458,14 @@ class AliveDaemon:
 		# TODO: Multiple upload endpoints
 		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
 			fileToUpload = {'segment': open(filePath,'rb')}
+			jsonbody = {'streamId':self.instance.link}
 			postUrl = self.instance.upload_endpoint + '/uploadStream?access_token=' + self.instance.access_token
-			upload = requests.post(postUrl,files=fileToUpload)
+			upload = requests.post(postUrl,files=fileToUpload,data=jsonbody)
 			if upload.status_code == 200:
 				return json.loads(upload.text)['hash']
 			else:
 				logging.error('IPFS upload failed')
+				logging.error(upload.text)
 				return False
 		else:
 			# Assume IPFS API unless stated otherwise
@@ -497,7 +500,7 @@ class AliveDaemon:
 
 		if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
 			postUrl = self.instance.upload_endpoint + '/uploadChunk?access_token=' + self.instance.access_token
-			upload = requests.post(postUrl,data=csv_content)
+			upload = requests.post(postUrl,data={'content':csv_content})
 			if upload.status_code == 200:
 				return json.loads(upload.text)['hash']
 			else:

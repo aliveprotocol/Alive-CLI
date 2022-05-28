@@ -1,3 +1,4 @@
+from time import sleep
 from alivedb import AliveDB
 import sys
 import string
@@ -17,6 +18,7 @@ new_pass = sys.argv[1]
 alivedb = AliveDB()
 alivedb.start()
 alivedb.create_user(id=uid,key=new_pass)
+sleep(1)
 alivedb.stop()
 
 print('User ID: ' + alivedb.userid)
