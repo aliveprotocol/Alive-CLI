@@ -12,9 +12,8 @@ import siaskynet as skynet
 from tabulate import tabulate
 from threading import Thread
 import time
+import avalon
 import base58
-import secp256k1
-import hashlib
 import ipfshttpclient
 import decrypt
 from beem import Hive
@@ -142,7 +141,7 @@ class AliveInstance:
 				raise RuntimeError('Avalon username does not exist')
 
 			# Avalon key
-			avalon_pubkey = base58.b58encode(secp256k1.PrivateKey(base58.b58decode(self.private_key)).pubkey.serialize()).decode('UTF-8')
+			avalon_pubkey = avalon.priv_to_pub(self.private_key)
 			if avalon_account.json()['pub'] != avalon_pubkey:
 				valid_key = False
 				for i in range(0,len(avalon_account.json()['keys'])):
@@ -237,6 +236,7 @@ class AliveDaemon:
 	alivedb_batch_interval = 300 # 5 minutes
 	concurrent_uploads = 0
 	nextStreamFilename = 0
+	chunk_count = 0
 	stream_filename = ''
 	is_running = False
 
@@ -517,28 +517,22 @@ class AliveDaemon:
 
 	def push_stream_avalon(self, chunk_hash: str) -> bool:
 		tx = {
-			'type': 19,
+			'type': 26,
 			'data': {
 				'link': self.instance.link,
-				'src': chunk_hash
+				'seq': [[self.chunk_count,chunk_hash]]
 			},
 			'sender': self.instance.username,
 			'ts': round(time.time() * 1000)
 		}
-		stringifiedTxToHash = json.dumps(tx,separators=(',', ':'))
-		tx['hash'] = hashlib.sha256(stringifiedTxToHash.encode('UTF-8')).hexdigest()
-
-		pk = secp256k1.PrivateKey(base58.b58decode(self.instance.private_key))
-		hexhash = bytes.fromhex(tx['hash'])
-		sign = pk.ecdsa_sign(hexhash,raw=True,digest=hashlib.sha256)
-		signature = base58.b58encode(pk.ecdsa_serialize_compact(sign)).decode('UTF-8')
-		tx['signature'] = signature
+		avalon.sign(tx,self.instance.username,self.instance.private_key)
 		headers = {
 			'Accept': 'application/json, text/plain, */*',
 			'Content-Type': 'application/json'
 		}
 		broadcast = requests.post(self.instance.api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
 		if broadcast.status_code == 200:
+			self.chunk_count += 1
 			return True
 		else:
 			try:
