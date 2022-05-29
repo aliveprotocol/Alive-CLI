@@ -14,7 +14,6 @@ from threading import Thread
 import time
 import avalon
 import base58
-import ipfshttpclient
 import decrypt
 from beem import Hive
 from beem.memo import Memo
@@ -146,7 +145,7 @@ class AliveInstance:
 				valid_key = False
 				for i in range(0,len(avalon_account.json()['keys'])):
 					# TODO: Update with the correct op # on livestreaming HF
-					if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [19, 20]):
+					if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [25, 26]):
 						self.custom_keyid = avalon_account.json()['keys'][i]['id']
 						valid_key = True
 						break
@@ -223,7 +222,7 @@ class AliveInstance:
 			else:
 				return access_token_request.json()['access_token']
 		elif self.protocol == 'IPFS':
-			self.ipfs_api = ipfshttpclient.connect(self.upload_endpoint)
+			return 'ipfsdaemon'
 		elif self.protocol == 'Skynet':
 			self.skynet_api = skynet.SkynetClient(self.upload_endpoint)
 		return 'noauth'
@@ -460,17 +459,32 @@ class AliveDaemon:
 			fileToUpload = {'segment': open(filePath,'rb')}
 			jsonbody = {'streamId':self.instance.link}
 			postUrl = self.instance.upload_endpoint + '/uploadStream?access_token=' + self.instance.access_token
-			upload = requests.post(postUrl,files=fileToUpload,data=jsonbody)
-			if upload.status_code == 200:
-				return json.loads(upload.text)['hash']
-			else:
+			try:
+				upload = requests.post(postUrl,files=fileToUpload,data=jsonbody)
+				fileToUpload['segment'].close()
+				if upload.status_code == 200:
+					return json.loads(upload.text)['hash']
+				else:
+					logging.error('IPFS upload errored',upload.text)
+					return False
+			except Exception:
 				logging.error('IPFS upload failed')
-				logging.error(upload.text)
 				return False
 		else:
 			# Assume IPFS API unless stated otherwise
-			ipfs_add = self.instance.ipfs_api.add(filePath,trickle=True)
-			return ipfs_add['Hash']
+			fileToAdd = {'file': open(filePath,'rb')}
+			try:
+				upload = requests.post(self.instance.upload_endpoint+'/api/v0/add',files=fileToAdd)
+				fileToAdd['file'].close()
+				if upload.status_code == 200:
+					return upload.json()['Hash']
+				else:
+					logging.error('IPFS add failed')
+					return False
+			except Exception as e:
+				fileToAdd['file'].close()
+				logging.error('IPFS add request failed',e)
+				return False
 
 	def skynet_chunk(self, hashes: list, lengths: list) -> str:
 		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
@@ -507,7 +521,24 @@ class AliveDaemon:
 				logging.error('IPFS upload failed')
 				return ''
 		else:
-			return self.instance.ipfs_api.add_str(csv_content)
+			csv_tmpfile = 'chunk_' + str(round(time.time()*1000))
+			f = open(csv_tmpfile,'x')
+			f.write(csv_content)
+			f.close()
+			try:
+				fileToAdd = {'file': open(csv_tmpfile)}
+				upload = requests.post(self.instance.upload_endpoint+'/api/v0/add',files=fileToAdd)
+				fileToAdd['file'].close()
+				if upload.status_code == 200:
+					return upload.json()['Hash']
+				else:
+					logging.error('IPFS add chunk failed')
+					return ''
+			except Exception as e:
+				fileToAdd['file'].close()
+				os.remove(csv_tmpfile)
+				logging.error('IPFS add chunk failed',e)
+				return ''
 
 	def csv_chunk(self, hashes: list, lengths: list) -> str:
 		assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'

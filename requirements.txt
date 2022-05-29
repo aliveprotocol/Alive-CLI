@@ -9,6 +9,5 @@ opencv-python
 base58>=2.0.1
 secp256k1
 cryptography
-ipfshttpclient==0.8.0a2
 pycryptodome>=3.14.1
 beem>=0.24.20
