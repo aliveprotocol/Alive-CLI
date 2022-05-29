@@ -14,27 +14,28 @@ if sys.argv[1] == 'dtc':
     import json
     import time
     import requests
-    import base58
-    import hashlib
-    import secp256k1
+    import avalon
 
+    playlist = requests.get(api+'/playlist/'+sender+'/'+link)
+    playlistJson = {}
+    if playlist.status_code == 200:
+        playlistJson = playlist.json()['json']
+        if 'ended' in playlistJson and isinstance(playlistJson['ended'],bool) and playlistJson['ended'] is True:
+            raise RuntimeError('Stream already ended')
+    else:
+        raise RuntimeError('Could not fetch playlist')
+    playlistJson['ended'] = True
     tx = {
-        'type': 20,
+        'type': 25,
         'data': {
-            'link': link
+            'link': link,
+            'json': playlistJson
         },
         'sender': sender,
         'ts': round(time.time() * 1000)
     }
 
-    txString = json.dumps(tx,separators=(',',':'))
-    tx['hash'] = hashlib.sha256(txString.encode('UTF-8')).hexdigest()
-
-    pk = secp256k1.PrivateKey(base58.b58decode(key))
-    hexhash = bytes.fromhex(tx['hash'])
-    sign = pk.ecdsa_sign(hexhash,raw=True,digest=hashlib.sha256)
-    signature = base58.b58encode(pk.ecdsa_serialize_compact(sign)).decode('UTF-8')
-    tx['signature'] = signature
+    avalon.sign(tx,sender,key)
 
     headers = {
         'Accept': 'application/json, text/plain, */*',

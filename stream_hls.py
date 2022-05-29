@@ -117,6 +117,7 @@ class AliveInstance:
 	data_dir: str = os.path.expanduser(os.path.join('~', '.alive'))
 	record_folder: str = 'record_here'
 	purge_files: bool = False
+	next_seq = 0
 
 	def __post_init__(self) -> None:
 		"""
@@ -128,11 +129,14 @@ class AliveInstance:
 		if self.network not in constants.valid_networks:
 			raise ValueError('Invalid network. Valid values are dtc and hive.')
 
+		# Validate link
+		self.__link_validator__(self.link)
+
 		# Init record folder
 		if (os.path.isabs(self.record_folder) == False):
 			self.record_folder = os.path.join(self.data_dir, self.record_folder)
 
-		# Network authentication
+		# Network authentication and sequence check
 		if self.network == 'dtc':
 			# Avalon username
 			avalon_account = requests.get(self.api + '/account/' + self.username)
@@ -144,7 +148,6 @@ class AliveInstance:
 			if avalon_account.json()['pub'] != avalon_pubkey:
 				valid_key = False
 				for i in range(0,len(avalon_account.json()['keys'])):
-					# TODO: Update with the correct op # on livestreaming HF
 					if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [25, 26]):
 						self.custom_keyid = avalon_account.json()['keys'][i]['id']
 						valid_key = True
@@ -156,6 +159,18 @@ class AliveInstance:
 			else:
 				self.custom_keyid = None
 				print('Logged in with master key')
+
+			# Fetch playlist
+			playlist = requests.get(self.api+'/playlist/'+self.username+'/'+self.link)
+			if playlist.status_code == 200:
+				playlistJson = playlist.json()
+				if 'json' in playlistJson and 'ended' in playlistJson['json'] and isinstance(playlistJson['json']['ended'],bool) and playlistJson['json']['ended'] is True:
+					raise RuntimeError('Stream already ended')
+				l = list(playlistJson['playlist'].keys())
+				if len(l) > 0:
+					l = [int(i) for i in l]
+					l.sort()
+					self.next_seq = l[len(l)-1]+1
 		elif self.network == 'hive':
 			hive_pubkey = account.PrivateKey(wif=self.private_key,prefix='TST').get_public_key()
 			valid_key = False
@@ -175,14 +190,8 @@ class AliveInstance:
 				raise RuntimeError('Invalid Hive private posting key')
 			self.graphene_client = Hive(node=self.api,keys=[self.private_key])
 
-		# Validate link
-		self.__link_validator__(self.link)
-
-		# TODO: Check if stream has ended already?
-
 		# Upload endpoint authentication
 		self.access_token = self.__upload_endpoint_auth__()
-
 
 	def __link_validator__(self, link: str) -> None:
 		"""
@@ -249,6 +258,9 @@ class AliveDaemon:
 		self.instance = instance
 		self.alivedb_instance = alivedb_instance
 		touchDir(self.instance.data_dir)
+		
+		if self.instance.next_seq:
+			self.chunk_count = self.instance.next_seq
 
 		self.filearr = [VideoFile(self.nextStreamFilename)]
 
