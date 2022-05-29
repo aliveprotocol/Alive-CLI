@@ -275,16 +275,16 @@ class AliveDaemon:
 
     def start_worker(self):
         symbols = {
-            'waiting for file':				' ',
-            'upload queued':				'.',
-            'uploading':					'↑',
-            'uploading with backup portal':	'↕',
-            'queued for re-uploading':		'↔',
-            're-uploading':					'↨',
-            'share queued':					'▒',
-            'sharing':						'▓',
-            'shared':						'█',
-            'share failed':					'x'
+            'waiting for file':             ' ',
+            'upload queued':                '.',
+            'uploading':                    '↑',
+            'uploading with backup portal': '↕',
+            'queued for re-uploading':      '↔',
+            're-uploading':                 '↨',
+            'share queued':                 '▒',
+            'sharing':                      '▓',
+            'shared':                       '█',
+            'share failed':                 'x'
         }
         touchDir(self.instance.record_folder)
 
