@@ -252,7 +252,8 @@ class AliveDaemon:
         """
         Instantiates Alive stream daemon. AliveDB instance must be running and logged in.
         """
-        assert alivedb_instance.process is not None, 'AliveDB is not running'
+        if alivedb_instance is not None:
+            assert alivedb_instance.process is not None, 'AliveDB is not running'
         assert alivedb_instance.is_logged_in(), 'AliveDB is not logged in'
         # Setup instance
         self.instance = instance
@@ -416,7 +417,7 @@ class AliveDaemon:
         link = [self.filearr[fileId].skylink]
         length = [round(self.filearr[fileId].length,3)]
 
-        broadcast_stream = None
+        broadcast_stream, chunk_hash = None
         should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.alivedb_batch_interval
 
         if self.alivedb_instance is not None:
@@ -426,6 +427,8 @@ class AliveDaemon:
             chunk_hash = self.process_chunk(link,length)
             if chunk_hash == '':
                 logging.error('failed to upload chunk')
+        if self.alivedb_instance is None:
+            chunk_hash = link[0]+','+str(length[0])
 
         if self.instance.network == 'dtc' and should_push_to_chains:
             broadcast_stream = self.push_stream_avalon(chunk_hash)
