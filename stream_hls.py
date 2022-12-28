@@ -172,7 +172,7 @@ class AliveInstance:
                     l.sort()
                     self.next_seq = l[len(l)-1]+1
         elif self.network == 'hive':
-            hive_pubkey = account.PrivateKey(wif=self.private_key,prefix='TST').get_public_key()
+            hive_pubkey = str(account.PrivateKey(wif=self.private_key).get_public_key())[3:]
             valid_key = False
             hive_accreq = {
                 'jsonrpc': '2.0',
@@ -183,7 +183,7 @@ class AliveInstance:
             # support posting authorities from other accounts?
             hive_acckeys = requests.post(self.api,json=hive_accreq).json()['result'][0]['posting']
             for i in range(len(hive_acckeys['key_auths'])):
-                if hive_acckeys['key_auths'][i][0] == str(hive_pubkey):
+                if hive_acckeys['key_auths'][i][0][3:] == hive_pubkey:
                     valid_key = True
                     break
             if valid_key != True:
