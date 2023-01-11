@@ -3,10 +3,10 @@ import base58
 import hashlib
 import secp256k1
 
-def sign(tx: dict, sender: str, private_key: str) -> None:
-    tx['sender'] = sender
-    stringifiedTx = json.dumps(tx,separators=(',', ':'))
-    tx['hash'] = hashlib.sha256(stringifiedTx.encode('UTF-8')).hexdigest()
+def sign(tx: dict, private_key: str) -> None:
+    if 'hash' not in tx:
+        stringifiedTx = json.dumps(tx,separators=(',', ':'))
+        tx['hash'] = hashlib.sha256(stringifiedTx.encode('UTF-8')).hexdigest()
     pk = secp256k1.PrivateKey(base58.b58decode(private_key))
     hexhash = bytes.fromhex(tx['hash'])
     sign = pk.ecdsa_recoverable_serialize(pk.ecdsa_sign_recoverable(hexhash,raw=True,digest=hashlib.sha256))

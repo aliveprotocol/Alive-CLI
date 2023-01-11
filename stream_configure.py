@@ -29,7 +29,7 @@ if sys.argv[1] == 'dtc':
         'sender': sender,
         'ts': round(time.time() * 1000)
     }
-    avalon.sign(tx,sender,key)
+    avalon.sign(tx,key)
 
     headers = {
         'Accept': 'application/json, text/plain, */*',

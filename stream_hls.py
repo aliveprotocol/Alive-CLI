@@ -574,7 +574,7 @@ class AliveDaemon:
             'sender': self.instance.username,
             'ts': round(time.time() * 1000)
         }
-        avalon.sign(tx,self.instance.username,self.instance.private_key)
+        avalon.sign(tx,self.instance.private_key)
         headers = {
             'Accept': 'application/json, text/plain, */*',
             'Content-Type': 'application/json'

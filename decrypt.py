@@ -8,6 +8,11 @@ from cryptography.hazmat.backends import default_backend
 from typing import Union
 
 def ecies_decrypt(priv_key, message_parts):
+    """
+    Performs an ECIES decryption based on javascript eccrypto library.
+
+    Usage: decrypt.ecies_decrypt(base58.b58decode('base58_encoded_private_key'),decrypt.js_to_py_encrypted('encrypted_message'))
+    """
     sender_public_key_obj = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), message_parts["ephemPublicKey"])
     private_key_obj = ec.derive_private_key(to_int(priv_key),ec.SECP256K1(),default_backend())
     aes_shared_key = private_key_obj.exchange(ec.ECDH(), sender_public_key_obj)
