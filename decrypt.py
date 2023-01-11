@@ -1,7 +1,7 @@
 from Crypto.Cipher import AES
 import hashlib
 import hmac
-import secp256k1
+import secp256k1prp as secp256k1
 import base58
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend

@@ -1,7 +1,7 @@
 import json
 import base58
 import hashlib
-import secp256k1
+import secp256k1prp as secp256k1
 
 def sign(tx: dict, private_key: str) -> None:
     if 'hash' not in tx:

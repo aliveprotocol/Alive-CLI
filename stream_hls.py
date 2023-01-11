@@ -13,11 +13,9 @@ from tabulate import tabulate
 from threading import Thread
 import time
 import avalon
-import base58
-import decrypt
 from beem import Hive
-from beem.memo import Memo
 from beemgraphenebase import account
+import oneloveipfs
 
 if '.' in __name__:
     from . import constants
@@ -189,6 +187,7 @@ class AliveInstance:
             if valid_key != True:
                 raise RuntimeError('Invalid Hive private posting key')
             self.graphene_client = Hive(node=self.api,keys=[self.private_key])
+            # TODO: Fetch playlist from HAF node
 
         # Upload endpoint authentication
         self.access_token = self.__upload_endpoint_auth__()
@@ -205,31 +204,17 @@ class AliveInstance:
 
     def __upload_endpoint_auth__(self) -> str:
         if self.protocol == 'IPFS' and self.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
-            loginUrl = self.upload_endpoint + '/login?user=' + self.username + '&network=' + self.network
-            if self.network == 'dtc' and self.custom_keyid != None:
-                loginUrl += '&dtckeyid=' + self.custom_keyid
-            auth_request = requests.get(loginUrl)
-            if auth_request.status_code != 200:
-                # TODO: Raise appropriate error message
-                raise RuntimeError('Could not authenticate to upload endpoint')
-
-            # Decrypt with Avalon key
-            encrypted_memo = auth_request.json()['encrypted_memo']
-            decrypted_memo = None
+            signed = ''
             if self.network == 'dtc':
-                decrypted_memo = decrypt.ecies_decrypt(base58.b58decode(self.private_key),decrypt.js_to_py_encrypted(encrypted_memo))
+                signed = oneloveipfs.sign_message_avalon(oneloveipfs.generate_message_to_sign(self.username,'avalon','oneloveipfs_login',self.api),self.private_key)
             elif self.network == 'hive':
-                decrypted_memo = Memo(blockchain_instance=self.graphene_client).decrypt(encrypted_memo)
-                decrypted_memo = decrypted_memo[1:len(decrypted_memo)]
+                signed = oneloveipfs.sign_message(oneloveipfs.generate_message_to_sign(self.username,'hive','oneloveipfs_login',self.api),self.private_key)
 
             # Obtain access token
-            headers = { 'Content-Type': 'text/plain' }
-            access_token_request = requests.post(self.upload_endpoint + '/logincb',data=decrypted_memo,headers=headers)
-            if access_token_request.status_code != 200:
-                # TODO: Raise appropriate error
-                raise RuntimeError('Could not authenticate to upload endpoint')
-            else:
-                return access_token_request.json()['access_token']
+            token = oneloveipfs.login(signed)
+            if token['error']:
+                raise RuntimeError(token['error'])
+            return token['access_token']
         elif self.protocol == 'IPFS':
             return 'ipfsdaemon'
         elif self.protocol == 'Skynet':
