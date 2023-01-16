@@ -203,7 +203,7 @@ class AliveDB:
         Push new stream to AliveDB.
         """
         assert self.process is not None, 'AliveDB is not running'
-        assert network == 'dtc' or network == 'hive', 'Network must be dtc or hive'
+        assert network == 'avalon' or network == 'hive', 'Network must be avalon or hive'
         new_stream = {
             'src': src,
             'len': length

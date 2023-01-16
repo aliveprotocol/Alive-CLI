@@ -21,7 +21,7 @@ def generate_message_to_sign(username: str, network: str, auth_id: str, api: str
             message = message+str(props['head_block_number'])+':'+str(props['head_block_id'])
         except:
             raise RuntimeError('Could not fetch dynamic global properties')
-    elif network == 'dtc' or network == 'avalon':
+    elif network == 'avalon' or network == 'avalon':
         try:
             count = requests.get(api+'/count').json()['count']
             bhash = requests.get(api+'/block/'+str(count)).json()['hash']

@@ -126,7 +126,7 @@ class AliveInstance:
             raise ValueError('Invalid P2P protocol. Valid values are IPFS and Skynet.')
 
         if self.network not in constants.valid_networks:
-            raise ValueError('Invalid network. Valid values are dtc and hive.')
+            raise ValueError('Invalid network. Valid values are avalon and hive.')
 
         if self.batch_interval > 300 or self.batch_interval < 0:
             raise ValueError('Batch interval must be between 0 and 300 seconds')
@@ -139,7 +139,7 @@ class AliveInstance:
             self.record_folder = os.path.join(self.data_dir, self.record_folder)
 
         # Network authentication and sequence check
-        if self.network == 'dtc':
+        if self.network == 'avalon':
             # Avalon username
             avalon_account = requests.get(self.api + '/account/' + self.username)
             if avalon_account.status_code != 200:
@@ -209,7 +209,7 @@ class AliveInstance:
     def __upload_endpoint_auth__(self) -> str:
         if self.protocol == 'IPFS' and self.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
             signed = ''
-            if self.network == 'dtc':
+            if self.network == 'avalon':
                 signed = oneloveipfs.sign_message_avalon(oneloveipfs.generate_message_to_sign(self.username,'avalon','oneloveipfs_login',self.api),self.private_key)
             elif self.network == 'hive':
                 signed = oneloveipfs.sign_message(oneloveipfs.generate_message_to_sign(self.username,'hive','oneloveipfs_login',self.api),self.private_key)
@@ -325,7 +325,7 @@ class AliveDaemon:
             if len(hashes) > 0 and len(lengths) > 0:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
                 chunk_hash = self.process_chunk(hashes,lengths)
-                if self.instance.network == 'dtc':
+                if self.instance.network == 'avalon':
                     self.push_stream_avalon(chunk_hash)
                 elif self.instance.network == 'hive':
                     self.push_stream_graphene(chunk_hash)
@@ -418,7 +418,7 @@ class AliveDaemon:
         if self.alivedb_instance is None:
             chunk_hash = link[0]+','+str(length[0])
 
-        if self.instance.network == 'dtc' and should_push_to_chains:
+        if self.instance.network == 'avalon' and should_push_to_chains:
             broadcast_stream = self.push_stream_avalon(chunk_hash)
         elif self.instance.network == 'hive' and should_push_to_chains:
             broadcast_stream = self.push_stream_graphene(chunk_hash)

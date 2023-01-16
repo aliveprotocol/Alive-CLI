@@ -9,7 +9,7 @@ link = sys.argv[3]
 sender = sys.argv[4]
 key = sys.argv[5]
 
-if sys.argv[1] == 'dtc':
+if sys.argv[1] == 'avalon':
     # Avalon
     import json
     import time

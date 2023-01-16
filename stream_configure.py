@@ -10,7 +10,7 @@ pub = sys.argv[4]
 sender = sys.argv[5]
 key = sys.argv[6]
 
-if sys.argv[1] == 'dtc':
+if sys.argv[1] == 'avalon':
     # Avalon
     import json
     import time

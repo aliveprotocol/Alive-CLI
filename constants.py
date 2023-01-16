@@ -16,4 +16,4 @@ authenticated_ipfs_upload_endpoints = [
 ]
 
 valid_protocols = ['IPFS','Skynet']
-valid_networks = ['dtc','hive']
+valid_networks = ['avalon','hive']

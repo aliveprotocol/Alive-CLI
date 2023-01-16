@@ -65,7 +65,7 @@ python3 alivedb_usercreate.py <new_alivedb_password>
 
 **Avalon**
 ```
-python3 stream_configure.py dtc <avalon_api_node> <link> <alivedb_pubkey> <username> <private_key>
+python3 stream_configure.py avalon <avalon_api_node> <link> <alivedb_pubkey> <username> <private_key>
 ```
 
 **Hive**
@@ -90,7 +90,7 @@ python3 alivecli.py -h
 
 **Avalon**
 ```
-python3 stream_end.py dtc <avalon_api_node> <link> <username> <private_key>
+python3 stream_end.py avalon <avalon_api_node> <link> <username> <private_key>
 ```
 
 **Hive**
