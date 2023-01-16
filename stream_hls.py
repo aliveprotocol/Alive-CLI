@@ -116,6 +116,7 @@ class AliveInstance:
     record_folder: str = 'record_here'
     purge_files: bool = False
     next_seq = 0
+    batch_interval: int = 300 # 5 minutes
 
     def __post_init__(self) -> None:
         """
@@ -126,6 +127,9 @@ class AliveInstance:
 
         if self.network not in constants.valid_networks:
             raise ValueError('Invalid network. Valid values are dtc and hive.')
+
+        if self.batch_interval > 300 or self.batch_interval < 0:
+            raise ValueError('Batch interval must be between 0 and 300 seconds')
 
         # Validate link
         self.__link_validator__(self.link)
@@ -226,7 +230,6 @@ class AliveDaemon:
     """
     Main daemon for Alive streams.
     """
-    alivedb_batch_interval = 300 # 5 minutes
     concurrent_uploads = 0
     nextStreamFilename = 0
     chunk_count = 0
@@ -403,7 +406,7 @@ class AliveDaemon:
         length = [round(self.filearr[fileId].length,3)]
 
         broadcast_stream, chunk_hash = None
-        should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.alivedb_batch_interval
+        should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval
 
         if self.alivedb_instance is not None:
             broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])

@@ -28,6 +28,7 @@ required_args.add_argument('-a','--api', help='API node URL', required=True, met
 required_args.add_argument('-u','--user', help='Username', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-k','--key', help='Private key (Avalon custom key must have PLAYLIST_JSON and PLAYLIST_PUSH permissions)', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True, metavar='', default=argparse.SUPPRESS)
+required_args.add_argument('-bi','--batch_interval', help='Number of seconds of stream segments to bundle into each chunk', required=True, type=int, metavar='', default=300)
 
 alivedb_args = parser.add_argument_group('AliveDB arguments')
 alivedb_args.add_argument('-gu','--alivedb_user', help='AliveDB user ID', metavar='', default=None)
@@ -64,6 +65,9 @@ elif args.alivedb_public_key is not None:
     alivedb_instance.login(key=args.alivedb_key, pub=args.alivedb_public_key)
 alivedb_instance.fetch_participants_keys()
 
+if args.batch_interval > 300 or args.batch_interval < 0:
+    parser.error('Batch interval must be between 0 and 300 seconds')
+
 alive_instance = AliveInstance(
     protocol=args.protocol,
     upload_endpoint=args.endpoint,
@@ -73,7 +77,8 @@ alive_instance = AliveInstance(
     private_key=args.key,
     link=args.link,
     data_dir=args.data_dir,
-    purge_files=args.purge_files
+    purge_files=args.purge_files,
+    batch_interval=args.batch_interval
 )
 
 alive_daemon = AliveDaemon(instance=alive_instance,alivedb_instance=alivedb_instance)
