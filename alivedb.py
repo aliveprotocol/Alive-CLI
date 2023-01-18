@@ -103,23 +103,29 @@ class AliveDB:
         :gun_port: GunDB P2P port to bind to
         """
         self.process = None
-        self.alivedir = alivedir
-        self.peers = peers
-        self.gun_port = gun_port
-        self.chat_listener = chat_listener
-        self.socket = alivedir + '/alivedb.sock'
-        self.socketurl = 'http+unix://'+('%2F'.join(self.socket.split('/')))
-        self.session = requests_unixsocket.Session()
+        self.external_process = alivedir.startswith('http://') or alivedir.startswith('https://')
 
-        if os.path.exists(self.socket):
-            os.remove(self.socket)
+        if self.external_process is False:
+            self.alivedir = alivedir
+            self.peers = peers
+            self.gun_port = gun_port
+            self.chat_listener = chat_listener
+            self.socket = alivedir + '/alivedb.sock'
+            self.socketurl = 'http+unix://'+('%2F'.join(self.socket.split('/')))
+            self.session = requests_unixsocket.Session()
+
+            if os.path.exists(self.socket):
+                os.remove(self.socket)
+        else:
+            self.socketurl = alivedir
+            self.session = requests
 
     def start(self) -> None:
         """
         Starts AliveDB daemon.
         """
         # TODO Check AliveDB installation
-        if self.process is not None:
+        if self.process is not None or self.external_process is False:
             return
         os.chdir(self.alivedir)
         cmd = ['node','src/index.js']
@@ -142,6 +148,7 @@ class AliveDB:
         Sends SIGINT to AliveDB daemon.
         """
         assert self.process is not None, 'AliveDB is not running'
+        assert self.external_process is False, 'Cannot stop AliveDB external process'
         os.kill(self.process.pid,signal.SIGINT)
         os.remove(self.alivedir+'/alivedb.sock')
         self.process = None
@@ -150,7 +157,7 @@ class AliveDB:
         """
         Create AliveDB user.
         """
-        assert self.process is not None, 'AliveDB is not running'
+        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
         json = {
             'id': id,
             'key': key
@@ -168,7 +175,7 @@ class AliveDB:
         """
         Login with AliveDB user ID or public key (one of which must not be blank) and key.
         """
-        assert self.process is not None, 'AliveDB is not running'
+        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
         if len(id) == 0 and len(pub) == 0:
             raise ValueError('User ID or public key is required')
         json = { 'key': key }
@@ -195,14 +202,14 @@ class AliveDB:
         return self.userid is not None and self.userkey is not None and self.userpub is not None
 
     def fetch_participants_keys(self) -> None:
-        assert self.process is not None, 'AliveDB is not running'
+        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
         self.session.get(self.socketurl+'/fetchParticipantsKeys')
 
     def push_stream(self, network: str, streamer: str, link: str, src: str, length: float) -> bool:
         """
         Push new stream to AliveDB.
         """
-        assert self.process is not None, 'AliveDB is not running'
+        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
         assert network == 'avalon' or network == 'hive', 'Network must be avalon or hive'
         new_stream = {
             'src': src,
