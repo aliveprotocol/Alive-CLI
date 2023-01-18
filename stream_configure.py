@@ -23,7 +23,8 @@ if sys.argv[1] == 'avalon':
             'link': link,
             'json': {
                 'live': True,
-                'pub': pub
+                'pub': pub,
+                'l2': 'gundb'
             }
         },
         'sender': sender,
@@ -45,7 +46,8 @@ elif sys.argv[1] == 'hive':
     json_data = {
         'op': 2,
         'link': link,
-        'pub': pub
+        'pub': pub,
+        'l2': 'gundb'
     }
 
     hive_client.custom_json('alive-test',json_data,required_posting_auths=[sender])
