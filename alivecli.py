@@ -63,7 +63,8 @@ if args.alivedb_user is not None:
     alivedb_instance.login(key=args.alivedb_key, id=args.alivedb_user)
 elif args.alivedb_public_key is not None:
     alivedb_instance.login(key=args.alivedb_key, pub=args.alivedb_public_key)
-alivedb_instance.fetch_participants_keys()
+if args.alivedb_automod is True:
+    alivedb_instance.fetch_participants_keys()
 
 if args.batch_interval > 300 or args.batch_interval < 0:
     parser.error('Batch interval must be between 0 and 300 seconds')

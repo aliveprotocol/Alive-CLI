@@ -147,8 +147,8 @@ class AliveDB:
         """
         Sends SIGINT to AliveDB daemon.
         """
-        assert self.process is not None, 'AliveDB is not running'
         assert self.external_process is False, 'Cannot stop AliveDB external process'
+        assert self.process is not None, 'AliveDB is not running'
         os.kill(self.process.pid,signal.SIGINT)
         os.remove(self.alivedir+'/alivedb.sock')
         self.process = None
@@ -157,7 +157,8 @@ class AliveDB:
         """
         Create AliveDB user.
         """
-        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
+        assert self.external_process is False, 'Unable to create user on external process'
+        assert self.process is not None, 'AliveDB is not running'
         json = {
             'id': id,
             'key': key
@@ -175,7 +176,8 @@ class AliveDB:
         """
         Login with AliveDB user ID or public key (one of which must not be blank) and key.
         """
-        assert self.external_process is True or self.process is not None, 'AliveDB is not running'
+        assert self.external_process is False, 'Unable to login on external process'
+        assert self.process is not None, 'AliveDB is not running'
         if len(id) == 0 and len(pub) == 0:
             raise ValueError('User ID or public key is required')
         json = { 'key': key }
