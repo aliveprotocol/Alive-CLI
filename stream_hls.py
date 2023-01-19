@@ -583,12 +583,14 @@ class AliveDaemon:
     def push_stream_graphene(self, chunk_hash: str) -> bool:
         json_data = {
             'op': 0,
+            'seq': self.chunk_count,
             'link': self.instance.link,
             'src': chunk_hash
         }
         logging.info('Broadcasting custom_json to Hive: ' + json.dumps(json_data))
         try:
             self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
+            self.chunk_count += 1
             return True
         except Exception as e:
             logging.error('Broadcast error: ' + str(e))
