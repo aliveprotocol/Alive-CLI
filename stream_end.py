@@ -1,5 +1,10 @@
 import sys
 
+if '.' in __name__:
+    from . import constants
+else:
+    import constants
+
 if len(sys.argv) != 6:
     print('Usage: python3 ' + sys.argv[0] + ' <network> <api_node> <link> <username> <private_key>')
     sys.exit(0)
@@ -53,6 +58,6 @@ elif sys.argv[1] == 'hive':
         'op': 1,
         'link': link
     }
-    hive_client.custom_json('alive-test',json_data,required_posting_auths=[sender])
+    hive_client.custom_json(constants.hive_custom_json_id,json_data,required_posting_auths=[sender])
 else:
     raise ValueError('Invalid network')

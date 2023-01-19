@@ -17,3 +17,6 @@ authenticated_ipfs_upload_endpoints = [
 
 valid_protocols = ['IPFS','Skynet']
 valid_networks = ['avalon','hive']
+
+# custom_json id to use
+hive_custom_json_id = 'alive-test'

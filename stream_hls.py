@@ -589,7 +589,7 @@ class AliveDaemon:
         }
         logging.info('Broadcasting custom_json to Hive: ' + json.dumps(json_data))
         try:
-            self.instance.graphene_client.custom_json('alive-test',json_data,required_posting_auths=[self.instance.username])
+            self.instance.graphene_client.custom_json(constants.hive_custom_json_id,json_data,required_posting_auths=[self.instance.username])
             self.chunk_count += 1
             return True
         except Exception as e:
