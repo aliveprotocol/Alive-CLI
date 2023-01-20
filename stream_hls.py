@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 import glob
-from cv2 import cv2
+import cv2
 import requests
 import json
 import shutil
@@ -183,7 +183,10 @@ class AliveInstance:
                 'params': [[self.username]]
             }
             # support posting authorities from other accounts?
-            hive_acckeys = requests.post(self.api,json=hive_accreq).json()['result'][0]['posting']
+            hive_acckeys_req = requests.post(self.api,json=hive_accreq)
+            if hive_acckeys_req.status_code != 200:
+                raise RuntimeError('Could not fetch Hive account, status code: '+str(hive_acckeys_req.status_code))
+            hive_acckeys = hive_acckeys_req.json()['result'][0]['posting']
             for i in range(len(hive_acckeys['key_auths'])):
                 if hive_acckeys['key_auths'][i][0][3:] == hive_pubkey:
                     valid_key = True
@@ -241,7 +244,7 @@ class AliveDaemon:
         Instantiates Alive stream daemon. AliveDB instance must be running and logged in.
         """
         if alivedb_instance is not None:
-            assert alivedb_instance.process is not None, 'AliveDB is not running'
+            assert alivedb_instance.external_process is True or alivedb_instance.process is not None, 'AliveDB is not running'
         assert alivedb_instance.is_logged_in(), 'AliveDB is not logged in'
         # Setup instance
         self.instance = instance
@@ -329,7 +332,8 @@ class AliveDaemon:
                     self.push_stream_avalon(chunk_hash)
                 elif self.instance.network == 'hive':
                     self.push_stream_graphene(chunk_hash)
-            self.alivedb_instance.stop()
+            if self.alivedb_instance.external_process is False:
+                self.alivedb_instance.stop()
 
         print('Alive daemon stopped successfully')
         if exit:
@@ -405,7 +409,8 @@ class AliveDaemon:
         link = [self.filearr[fileId].skylink]
         length = [round(self.filearr[fileId].length,3)]
 
-        broadcast_stream, chunk_hash = None
+        broadcast_stream = None
+        chunk_hash = None
         should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval
 
         if self.alivedb_instance is not None:

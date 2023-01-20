@@ -120,6 +120,16 @@ class AliveDB:
             self.socketurl = alivedir
             self.session = requests
 
+            # fetch login
+            alivedb_session_login = self.session.get(self.socketurl+'/currentUser')
+            if alivedb_session_login.status_code != 200:
+                raise RuntimeError('Failed to fetch AliveDB login status from external process, status code: '+str(alivedb_session_login.status_code))
+            external_login = alivedb_session_login.json()
+            if 'pub' in external_login:
+                self.userpub = external_login['pub']
+            if 'alias' in external_login:
+                self.userid = external_login['alias']
+
     def start(self) -> None:
         """
         Starts AliveDB daemon.
@@ -201,7 +211,7 @@ class AliveDB:
         """
         Checks if current AliveDB instance is logged in.
         """
-        return self.userid is not None and self.userkey is not None and self.userpub is not None
+        return self.userid is not None and (self.userkey is not None or self.external_process is True) and self.userpub is not None
 
     def fetch_participants_keys(self) -> None:
         assert self.external_process is True or self.process is not None, 'AliveDB is not running'
