@@ -1,4 +1,5 @@
 import sys
+from pprint import pprint
 
 if '.' in __name__:
     from . import constants
@@ -55,6 +56,6 @@ elif sys.argv[1] == 'hive':
         'l2': 'gundb'
     }
 
-    hive_client.custom_json(constants.hive_custom_json_id,json_data,required_posting_auths=[sender])
+    pprint(hive_client.custom_json(constants.hive_custom_json_id,json_data,required_posting_auths=[sender]))
 else:
     raise ValueError('Invalid network')
