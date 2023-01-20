@@ -553,7 +553,9 @@ class AliveDaemon:
 
         csv_content = ''
         for i in range(len(hashes)):
-            csv_content += hashes[i] + ',' + str(lengths[i]) + '\n'
+            if len(csv_content) > 0:
+                csv_content += '\n'
+            csv_content += hashes[i] + ',' + str(lengths[i])
 
         return csv_content
 
