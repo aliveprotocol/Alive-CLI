@@ -31,6 +31,7 @@ required_args.add_argument('-l','--link', help='Livestream permlink, generated a
 required_args.add_argument('-bi','--batch_interval', help='Number of seconds of stream segments to bundle into each chunk', required=True, type=int, metavar='', default=300)
 
 alivedb_args = parser.add_argument_group('AliveDB arguments')
+alivedb_args.add_argument('-ge','--alivedb_endpoint', help='AliveDB external process endpoint', metavar='', type=str, default=None)
 alivedb_args.add_argument('-gu','--alivedb_user', help='AliveDB user ID', metavar='', default=None)
 alivedb_args.add_argument('-gpuk','--alivedb_public_key', help='AliveDB public key (if no user ID)', metavar='', default=None)
 alivedb_args.add_argument('-gk','--alivedb_key', help='AliveDB user key', metavar='', default=None)
@@ -46,25 +47,30 @@ else:
 
 alivedb_instance = None
 
-if args.alivedb_user is None and args.alivedb_public_key is None:
-    parser.error('Either AliveDB user ID or public key must be present')
+if args.alivedb_user is None and args.alivedb_public_key is None and args.alivedb_endpoint is None:
+    parser.error('Either AliveDB user ID, public key or external process endpoint must be present')
 if args.alivedb_key is None:
     parser.error('AliveDB user key is missing')
 chat_listener = ''
 if args.alivedb_automod is True:
     chat_listener = args.network+'/'+args.user+'/'+args.link
-alivedb_instance = AliveDB(
-    alivedir=args.data_dir+'/AliveDB',
-    peers=args.alivedb_peers,
-    chat_listener=chat_listener
-)
-alivedb_instance.start()
-if args.alivedb_user is not None:
-    alivedb_instance.login(key=args.alivedb_key, id=args.alivedb_user)
-elif args.alivedb_public_key is not None:
-    alivedb_instance.login(key=args.alivedb_key, pub=args.alivedb_public_key)
-if args.alivedb_automod is True:
-    alivedb_instance.fetch_participants_keys()
+if args.alivedb_endpoint is not None:
+    if not args.alivedb_endpoint.startsWith('http://') and not args.alivedb_endpoint.startsWith('https://'):
+        parser.error('AliveDB external endpoint must start with http:// or https://')
+    alive_instance = AliveDB(alivedir=args.alivedb_endpoint)
+else:
+    alivedb_instance = AliveDB(
+        alivedir=args.data_dir+'/AliveDB',
+        peers=args.alivedb_peers,
+        chat_listener=chat_listener
+    )
+    alivedb_instance.start()
+    if args.alivedb_user is not None:
+        alivedb_instance.login(key=args.alivedb_key, id=args.alivedb_user)
+    elif args.alivedb_public_key is not None:
+        alivedb_instance.login(key=args.alivedb_key, pub=args.alivedb_public_key)
+    if args.alivedb_automod is True:
+        alivedb_instance.fetch_participants_keys()
 
 if args.batch_interval > 300 or args.batch_interval < 0:
     parser.error('Batch interval must be between 0 and 300 seconds')
