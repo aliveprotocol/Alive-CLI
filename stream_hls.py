@@ -412,21 +412,26 @@ class AliveDaemon:
         broadcast_stream = None
         chunk_hash = None
         should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval
+        single_segment = self.alivedb_instance is None or (len(link) == 1 and len(length) == 1)
 
         if self.alivedb_instance is not None:
             broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])
         if self.alivedb_instance is not None and should_push_to_chains:
             link, length = self.alivedb_instance.pop_recent_streams()
-            chunk_hash = self.process_chunk(link,length)
-            if chunk_hash == '':
-                logging.error('failed to upload chunk')
-        if self.alivedb_instance is None:
+            if single_segment is False:
+                chunk_hash = self.process_chunk(link,length)
+                if chunk_hash == '':
+                    logging.error('failed to upload chunk')
+        if single_segment:
             chunk_hash = link[0]+','+str(length[0])
 
         if self.instance.network == 'avalon' and should_push_to_chains:
             broadcast_stream = self.push_stream_avalon(chunk_hash)
         elif self.instance.network == 'hive' and should_push_to_chains:
-            broadcast_stream = self.push_stream_graphene(chunk_hash)
+            if single_segment:
+                broadcast_stream = self.push_stream_graphene(link[0],length[0])
+            else:
+                broadcast_stream = self.push_stream_graphene(chunk_hash)
 
         if broadcast_stream != True:
             logging.error('Failed to push stream')
@@ -587,13 +592,15 @@ class AliveDaemon:
             logging.error('Transaction: ' + json.dumps(tx))
             return False
 
-    def push_stream_graphene(self, chunk_hash: str) -> bool:
+    def push_stream_graphene(self, chunk_hash: str, length: float = None) -> bool:
         json_data = {
             'op': 0,
             'seq': self.chunk_count,
             'link': self.instance.link,
             'src': chunk_hash
         }
+        if length is not None:
+            json_data['len'] = length
         logging.info('Broadcasting custom_json to Hive: ' + json.dumps(json_data))
         try:
             self.instance.graphene_client.custom_json(constants.hive_custom_json_id,json_data,required_posting_auths=[self.instance.username])
