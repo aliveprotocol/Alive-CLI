@@ -109,6 +109,7 @@ class AliveInstance:
     upload_endpoint: str
     network: str
     api: str
+    halive_api: str
     username: str
     private_key: str
     link: str
@@ -194,7 +195,19 @@ class AliveInstance:
             if valid_key != True:
                 raise RuntimeError('Invalid Hive private posting key')
             self.graphene_client = Hive(node=self.api,keys=[self.private_key])
-            # TODO: Fetch playlist from HAF node
+
+            # Fetch playlist from HAF node
+            playlist = requests.get(self.halive_api+'/get_stream_info?author='+self.username+'&link='+self.link)
+            if playlist.status_code != 200:
+                raise RuntimeError('Failed to fetch stream info')
+            playlistJson = playlist.json()
+            if 'error' in playlistJson:
+                raise RuntimeError(playlistJson['error'])
+            if playlistJson['chunk_finalized'] is not None:
+                self.next_seq = playlistJson['chunk_finalized']+1
+                print('Next sequence: '+str(self.next_seq))
+            else:
+                self.next_seq = 0
 
         # Upload endpoint authentication
         self.access_token = self.__upload_endpoint_auth__()
