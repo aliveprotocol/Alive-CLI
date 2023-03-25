@@ -338,13 +338,19 @@ class AliveDaemon:
         # Push all remaining AliveDB stream data to blockchains if any
         if self.alivedb_instance is not None:
             hashes, lengths = self.alivedb_instance.pop_recent_streams()
-            if len(hashes) > 0 and len(lengths) > 0:
+            if len(hashes) > 1 and len(lengths) > 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
                 chunk_hash = self.process_chunk(hashes,lengths)
                 if self.instance.network == 'avalon':
                     self.push_stream_avalon(chunk_hash)
                 elif self.instance.network == 'hive':
                     self.push_stream_graphene(chunk_hash)
+            elif len(hashes) == 1 and len(lengths) == 1:
+                print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
+                if self.instance.network == 'avalon':
+                    self.push_stream_avalon(hashes[0]+','+str(lengths[0]))
+                elif self.instance.network == 'hive':
+                    self.push_stream_graphene(hashes[0],lengths[0])
             if self.alivedb_instance.external_process is False:
                 self.alivedb_instance.stop()
 
