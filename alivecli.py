@@ -25,6 +25,7 @@ parser.add_argument('-v','--version', help='Print the version', action='version'
 required_args = parser.add_argument_group('required arguments')
 required_args.add_argument('-n','--network', help='Network (valid values are avalon and hive)', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-a','--api', help='API node URL', required=True, metavar='', default=argparse.SUPPRESS)
+required_args.add_argument('-ha','--halive_api', help='HAlive API node URL', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-u','--user', help='Username', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-k','--key', help='Private key (Avalon custom key must have PLAYLIST_JSON and PLAYLIST_PUSH permissions)', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True, metavar='', default=argparse.SUPPRESS)
@@ -80,6 +81,7 @@ alive_instance = AliveInstance(
     upload_endpoint=args.endpoint,
     network=args.network,
     api=args.api,
+    halive_api=args.halive_api,
     username=args.user,
     private_key=args.key,
     link=args.link,
