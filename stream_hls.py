@@ -431,16 +431,19 @@ class AliveDaemon:
         broadcast_stream = None
         chunk_hash = None
         should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval
-        single_segment = self.alivedb_instance is None or (len(link) == 1 and len(length) == 1)
+        single_segment = False
 
         if self.alivedb_instance is not None:
             broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])
-        if self.alivedb_instance is not None and should_push_to_chains:
-            link, length = self.alivedb_instance.pop_recent_streams()
-            if single_segment is False:
-                chunk_hash = self.process_chunk(link,length)
-                if chunk_hash == '':
-                    logging.error('failed to upload chunk')
+            if should_push_to_chains:
+                link, length = self.alivedb_instance.pop_recent_streams()
+                single_segment = len(link) == 1 and len(length) == 1
+                if single_segment is False:
+                    chunk_hash = self.process_chunk(link,length)
+                    if chunk_hash == '':
+                        logging.error('failed to upload chunk')
+        else:
+            single_segment = True
         if single_segment:
             chunk_hash = link[0]+','+str(length[0])
 
