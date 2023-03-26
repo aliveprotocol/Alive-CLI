@@ -59,7 +59,7 @@ if args.alivedb_endpoint is not None:
     if not args.alivedb_endpoint.startsWith('http://') and not args.alivedb_endpoint.startsWith('https://'):
         parser.error('AliveDB external endpoint must start with http:// or https://')
     alive_instance = AliveDB(alivedir=args.alivedb_endpoint)
-else:
+elif args.batch_interval > 0:
     alivedb_instance = AliveDB(
         alivedir=args.data_dir+'/AliveDB',
         peers=args.alivedb_peers,
