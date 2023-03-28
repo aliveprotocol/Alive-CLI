@@ -16,40 +16,7 @@ sender = sys.argv[4]
 key = sys.argv[5]
 
 if sys.argv[1] == 'avalon':
-    # Avalon
-    import json
-    import time
-    import requests
-    import avalon
-
-    playlist = requests.get(api+'/playlist/'+sender+'/'+link)
-    playlistJson = {}
-    if playlist.status_code == 200:
-        playlistJson = playlist.json()['json']
-        if 'ended' in playlistJson and isinstance(playlistJson['ended'],bool) and playlistJson['ended'] is True:
-            raise RuntimeError('Stream already ended')
-    else:
-        raise RuntimeError('Could not fetch playlist')
-    playlistJson['ended'] = True
-    tx = {
-        'type': 25,
-        'data': {
-            'link': link,
-            'json': playlistJson
-        },
-        'sender': sender,
-        'ts': round(time.time() * 1000)
-    }
-
-    avalon.sign(tx,key)
-
-    headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Content-Type': 'application/json'
-    }
-    broadcast = requests.post(api + '/transact',data=json.dumps(tx,separators=(',',':')),headers=headers)
-    print(broadcast.text)
-
+    raise RuntimeError('Avalon network is deprecated')
 elif sys.argv[1] == 'hive':
     # Hive
     from beem import Hive

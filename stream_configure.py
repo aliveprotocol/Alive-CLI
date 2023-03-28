@@ -21,33 +21,7 @@ if len(sys.argv) >= 8:
     gw = sys.argv[7]
 
 if sys.argv[1] == 'avalon':
-    # Avalon
-    import json
-    import time
-    import requests
-    import avalon
-
-    tx = {
-        'type': 25,
-        'data': {
-            'link': link,
-            'json': {
-                'live': True,
-                'pub': pub,
-                'l2': 'gundb'
-            }
-        },
-        'sender': sender,
-        'ts': round(time.time() * 1000)
-    }
-    avalon.sign(tx,key)
-
-    headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Content-Type': 'application/json'
-    }
-    broadcast = requests.post(api + '/transact',data=json.dumps(tx,separators=(',',':')),headers=headers)
-    print(broadcast.text)
+    raise RuntimeError('Avalon network is deprecated')
 elif sys.argv[1] == 'hive':
     # Hive
     from beem import Hive

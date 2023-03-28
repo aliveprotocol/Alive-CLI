@@ -15,6 +15,8 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+default_network = 'hive'
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Alive Protocol HLS Streamer CLI Tool')
 parser.add_argument('-d','--data_dir', help='Data directory for stream recording, AliveDB and log files.', default=os.path.expanduser(os.path.join('~', '.alive')), metavar='')
 parser.add_argument('-f','--purge_files', type=str2bool, default=False, help='Purges .ts chunks after upload.', metavar='')
@@ -23,7 +25,7 @@ parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint.', meta
 parser.add_argument('-v','--version', help='Print the version', action='version', version=__version__)
 
 required_args = parser.add_argument_group('required arguments')
-required_args.add_argument('-n','--network', help='Network (valid values are avalon and hive)', required=True, metavar='', default=argparse.SUPPRESS)
+# required_args.add_argument('-n','--network', help='Network (valid values are avalon and hive)', metavar='', default='hive')
 required_args.add_argument('-a','--api', help='API node URL', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-ha','--halive_api', help='HAlive API node URL', required=True, metavar='', default=argparse.SUPPRESS)
 required_args.add_argument('-u','--user', help='Username', required=True, metavar='', default=argparse.SUPPRESS)
@@ -54,7 +56,7 @@ if args.alivedb_key is None:
     parser.error('AliveDB user key is missing')
 chat_listener = ''
 if args.alivedb_automod is True:
-    chat_listener = args.network+'/'+args.user+'/'+args.link
+    chat_listener = default_network+'/'+args.user+'/'+args.link
 if args.alivedb_endpoint is not None:
     if not args.alivedb_endpoint.startsWith('http://') and not args.alivedb_endpoint.startsWith('https://'):
         parser.error('AliveDB external endpoint must start with http:// or https://')
@@ -79,7 +81,7 @@ if args.batch_interval > 300 or args.batch_interval < 0:
 alive_instance = AliveInstance(
     protocol=args.protocol,
     upload_endpoint=args.endpoint,
-    network=args.network,
+    network=default_network,
     api=args.api,
     halive_api=args.halive_api,
     username=args.user,

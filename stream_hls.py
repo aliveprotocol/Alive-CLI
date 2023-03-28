@@ -12,7 +12,6 @@ import siaskynet as skynet
 from tabulate import tabulate
 from threading import Thread
 import time
-import avalon
 from beem import Hive
 from beemgraphenebase import account
 import oneloveipfs
@@ -141,39 +140,7 @@ class AliveInstance:
 
         # Network authentication and sequence check
         if self.network == 'avalon':
-            # Avalon username
-            avalon_account = requests.get(self.api + '/account/' + self.username)
-            if avalon_account.status_code != 200:
-                raise RuntimeError('Avalon username does not exist')
-
-            # Avalon key
-            avalon_pubkey = avalon.priv_to_pub(self.private_key)
-            if avalon_account.json()['pub'] != avalon_pubkey:
-                valid_key = False
-                for i in range(0,len(avalon_account.json()['keys'])):
-                    if avalon_account.json()['keys'][i]['pub'] == avalon_pubkey and all(x in avalon_account.json()['keys'][i]['types'] for x in [25, 26]):
-                        self.custom_keyid = avalon_account.json()['keys'][i]['id']
-                        valid_key = True
-                        break
-                if valid_key == False:
-                    raise RuntimeError('Invalid Avalon key')
-                else:
-                    print('Logged in with custom key')
-            else:
-                self.custom_keyid = None
-                print('Logged in with master key')
-
-            # Fetch playlist
-            playlist = requests.get(self.api+'/playlist/'+self.username+'/'+self.link)
-            if playlist.status_code == 200:
-                playlistJson = playlist.json()
-                if 'json' in playlistJson and 'ended' in playlistJson['json'] and isinstance(playlistJson['json']['ended'],bool) and playlistJson['json']['ended'] is True:
-                    raise RuntimeError('Stream already ended')
-                l = list(playlistJson['playlist'].keys())
-                if len(l) > 0:
-                    l = [int(i) for i in l]
-                    l.sort()
-                    self.next_seq = l[len(l)-1]+1
+            raise RuntimeError('Avalon network is deprecated')
         elif self.network == 'hive':
             hive_pubkey = str(account.PrivateKey(wif=self.private_key).get_public_key())[3:]
             valid_key = False
@@ -225,9 +192,7 @@ class AliveInstance:
     def __upload_endpoint_auth__(self) -> str:
         if self.protocol == 'IPFS' and self.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
             signed = ''
-            if self.network == 'avalon':
-                signed = oneloveipfs.sign_message_avalon(oneloveipfs.generate_message_to_sign(self.username,'avalon','oneloveipfs_login',self.api),self.private_key)
-            elif self.network == 'hive':
+            if self.network == 'hive':
                 signed = oneloveipfs.sign_message(oneloveipfs.generate_message_to_sign(self.username,'hive','oneloveipfs_login',self.api),self.private_key)
 
             # Obtain access token
@@ -341,15 +306,11 @@ class AliveDaemon:
             if len(hashes) > 1 and len(lengths) > 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
                 chunk_hash = self.process_chunk(hashes,lengths)
-                if self.instance.network == 'avalon':
-                    self.push_stream_avalon(chunk_hash)
-                elif self.instance.network == 'hive':
+                if self.instance.network == 'hive':
                     self.push_stream_graphene(chunk_hash)
             elif len(hashes) == 1 and len(lengths) == 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
-                if self.instance.network == 'avalon':
-                    self.push_stream_avalon(hashes[0]+','+str(lengths[0]))
-                elif self.instance.network == 'hive':
+                if self.instance.network == 'hive':
                     self.push_stream_graphene(hashes[0],lengths[0])
             if self.alivedb_instance.external_process is False:
                 self.alivedb_instance.stop()
@@ -447,9 +408,7 @@ class AliveDaemon:
         if single_segment:
             chunk_hash = link[0]+','+str(length[0])
 
-        if self.instance.network == 'avalon' and should_push_to_chains:
-            broadcast_stream = self.push_stream_avalon(chunk_hash)
-        elif self.instance.network == 'hive' and should_push_to_chains:
+        if self.instance.network == 'hive' and should_push_to_chains:
             if single_segment:
                 broadcast_stream = self.push_stream_graphene(link[0],length[0])
             else:
@@ -585,34 +544,6 @@ class AliveDaemon:
             csv_content += hashes[i] + ',' + str(lengths[i])
 
         return csv_content
-
-    def push_stream_avalon(self, chunk_hash: str) -> bool:
-        tx = {
-            'type': 26,
-            'data': {
-                'link': self.instance.link,
-                'seq': [[self.chunk_count,chunk_hash]]
-            },
-            'sender': self.instance.username,
-            'ts': round(time.time() * 1000)
-        }
-        avalon.sign(tx,self.instance.private_key)
-        headers = {
-            'Accept': 'application/json, text/plain, */*',
-            'Content-Type': 'application/json'
-        }
-        broadcast = requests.post(self.instance.api + '/transact',data=json.dumps(tx,separators=(',', ':')),headers=headers)
-        if broadcast.status_code == 200:
-            self.chunk_count += 1
-            return True
-        else:
-            try:
-                err = broadcast.json()
-                logging.error(err['error'])
-            except Exception as e:
-                logging.error('Broadcast error: ' + e)
-            logging.error('Transaction: ' + json.dumps(tx))
-            return False
 
     def push_stream_graphene(self, chunk_hash: str, length: float = None) -> bool:
         json_data = {
