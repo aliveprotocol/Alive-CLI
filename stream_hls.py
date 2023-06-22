@@ -8,7 +8,6 @@ import cv2
 import requests
 import json
 import shutil
-import siaskynet as skynet
 from tabulate import tabulate
 from threading import Thread
 import time
@@ -122,8 +121,10 @@ class AliveInstance:
         """
         Validates each value passed in AliveInstance and performs neccessary authentication.
         """
-        if self.protocol not in constants.valid_protocols:
-            raise ValueError('Invalid P2P protocol. Valid values are IPFS and Skynet.')
+        if self.protocol == 'skynet':
+            raise RuntimeError('Skynet is deprecated')
+        elif self.protocol not in constants.valid_protocols:
+            raise ValueError('Invalid P2P protocol. Valid values are IPFS.')
 
         if self.network not in constants.valid_networks:
             raise ValueError('Invalid network. Valid values are avalon and hive.')
@@ -202,8 +203,6 @@ class AliveInstance:
             return token['access_token']
         elif self.protocol == 'IPFS':
             return 'ipfsdaemon'
-        elif self.protocol == 'Skynet':
-            self.skynet_api = skynet.SkynetClient(self.upload_endpoint)
         return 'noauth'
 
 
@@ -334,14 +333,7 @@ class AliveDaemon:
         while True:
             # upload and retry if fails with backup portals
             skylink = False
-            if self.instance.protocol == 'Skynet':
-                for upload_portal in constants.skynet_upload_portals:
-                    skylink = self.skynet_push(filePath, upload_portal)
-                    if skylink != False:
-                        break
-                    else:
-                        self.filearr[fileId].status = 'uploading with backup portal'
-            elif self.instance.protocol == 'IPFS':
+            if self.instance.protocol == 'IPFS':
                 skylink = self.ipfs_push(filePath)
 
             if (skylink != False and len(skylink) >= 46):
@@ -423,29 +415,8 @@ class AliveDaemon:
             return True
 
     def process_chunk(self, hashes: list, lengths: list):
-        if self.instance.protocol == 'Skynet':
-            return self.skynet_chunk(hashes, lengths)
-        elif self.instance.protocol == 'IPFS':
+        if self.instance.protocol == 'IPFS':
             return self.ipfs_chunk(hashes,lengths)
-
-    def skynet_push(self,filePath, portal):
-        logging.debug('Uploading ' + str(filePath) + ' with ' + str(portal))
-
-        opts = type('obj', (object,), {
-            'portal_url': portal,
-            'timeout': 60,
-            'timeout_seconds': 60
-        })
-
-        try:
-            try:
-                return self.instance.skynet_api.upload_file(filePath, opts)            
-            except TimeoutError:
-                logging.error('Uploading timeout with ' + str(portal))
-                return False
-        except:
-            logging.error('Uploading failed with ' + str(portal))
-            return False
 
     def ipfs_push(self,filePath):
         # TODO: Multiple upload endpoints
@@ -479,27 +450,6 @@ class AliveDaemon:
                 fileToAdd['file'].close()
                 logging.error('IPFS add request failed',e)
                 return False
-
-    def skynet_chunk(self, hashes: list, lengths: list) -> str:
-        assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
-        
-        csv_content = self.csv_chunk(hashes,lengths)
-        csv_tmpfile = 'chunk_' + str(round(time.time()*1000))
-        f = open(csv_tmpfile,'x')
-        f.write(csv_content)
-        f.close()
-
-        try:
-            try:
-                sk = self.instance.skynet_api.upload_file(csv_tmpfile)
-                os.remove(csv_tmpfile)
-                return sk
-            except TimeoutError:
-                logging.error('Chunk upload timeout, filename: ' + csv_tmpfile)
-                return ''
-        except:
-            logging.error('Chunk upload failed, filename: ' + csv_tmpfile)
-            return ''
 
     def ipfs_chunk(self, hashes: list, lengths: list) -> str:
         assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
