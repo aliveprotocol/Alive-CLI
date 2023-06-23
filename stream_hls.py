@@ -419,7 +419,6 @@ class AliveDaemon:
             return self.ipfs_chunk(hashes,lengths)
 
     def ipfs_push(self,filePath):
-        # TODO: Multiple upload endpoints
         if self.instance.upload_endpoint in constants.authenticated_ipfs_upload_endpoints:
             fileToUpload = {'segment': open(filePath,'rb')}
             jsonbody = {'streamId':self.instance.link}

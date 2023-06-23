@@ -20,8 +20,8 @@ default_network = 'hive'
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description='Alive Protocol HLS Streamer CLI Tool')
 parser.add_argument('-d','--data_dir', help='Data directory for stream recording, AliveDB and log files.', default=os.path.expanduser(os.path.join('~', '.alive')), metavar='')
 parser.add_argument('-f','--purge_files', type=str2bool, default=False, help='Purges .ts chunks after upload.', metavar='')
-parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams. Valid values: IPFS and Skynet.', metavar='', default='IPFS')
-parser.add_argument('-e','--endpoint', help='IPFS/Skynet upload endpoint.', metavar='', default='/ip4/127.0.0.1/tcp/5001/http')
+parser.add_argument('-p','--protocol', help='P2P protocol for HLS streams. Valid values: IPFS.', metavar='', default='IPFS')
+parser.add_argument('-e','--endpoint', help='IPFS upload endpoint.', metavar='', default='/ip4/127.0.0.1/tcp/5001/http')
 parser.add_argument('-v','--version', help='Print the version', action='version', version=__version__)
 
 required_args = parser.add_argument_group('required arguments')
