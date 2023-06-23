@@ -103,9 +103,9 @@ class AliveInstance:
     """
     Data class that holds configuration for AliveDaemon.
     """
-    protocol: str
+    protocol: str = 'IPFS'
     upload_endpoint: str
-    network: str
+    network: str = 'hive'
     api: str
     halive_api: str
     username: str
@@ -127,7 +127,7 @@ class AliveInstance:
             raise ValueError('Invalid P2P protocol. Valid values are IPFS.')
 
         if self.network not in constants.valid_networks:
-            raise ValueError('Invalid network. Valid values are avalon and hive.')
+            raise ValueError('Invalid network. Valid values are hive.')
 
         if self.batch_interval > 300 or self.batch_interval < 0:
             raise ValueError('Batch interval must be between 0 and 300 seconds')
