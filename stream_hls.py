@@ -103,14 +103,14 @@ class AliveInstance:
     """
     Data class that holds configuration for AliveDaemon.
     """
-    protocol: str = 'IPFS'
     upload_endpoint: str
-    network: str = 'hive'
     api: str
     halive_api: str
     username: str
     private_key: str
     link: str
+    protocol: str = 'IPFS'
+    network: str = 'hive'
     data_dir: str = os.path.expanduser(os.path.join('~', '.alive'))
     record_folder: str = 'record_here'
     purge_files: bool = False
@@ -165,7 +165,7 @@ class AliveInstance:
             self.graphene_client = Hive(node=self.api,keys=[self.private_key])
 
             # Fetch playlist from HAF node
-            playlist = requests.get(self.halive_api+'/get_stream_info?author='+self.username+'&link='+self.link)
+            playlist = requests.get(self.halive_api+'/get_stream_info?stream_author='+self.username+'&stream_link='+self.link)
             if playlist.status_code != 200:
                 raise RuntimeError('Failed to fetch stream info')
             playlistJson = playlist.json()
