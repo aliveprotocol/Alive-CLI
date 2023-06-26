@@ -5,6 +5,7 @@ import requests
 import requests_unixsocket
 import time
 import hashlib
+from oneloveipfs import sign_message
 
 if '.' in __name__:
     from .alivedb_integrity import integrity
@@ -91,6 +92,9 @@ class AliveDB:
     userid = None
     userpub = None
     userkey = None
+    requires_access_token = False
+    access_token = ''
+    auth_identifier = ''
 
     def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, chat_listener: str = '') -> None:
         """
@@ -127,6 +131,9 @@ class AliveDB:
                 self.userpub = external_login['pub']
             if 'alias' in external_login:
                 self.userid = external_login['alias']
+            if 'requiresAccessToken' in external_login and external_login['requiresAccessToken']:
+                self.requires_access_token = True
+                self.auth_identifier = external_login['authId']
 
     def start(self) -> None:
         """
@@ -220,7 +227,9 @@ class AliveDB:
         Push new stream to AliveDB.
         """
         assert self.external_process is True or self.process is not None, 'AliveDB is not running'
-        assert network == 'avalon' or network == 'hive', 'Network must be avalon or hive'
+        assert network == 'hive', 'Network must be hive'
+        if self.requires_access_token:
+            assert len(self.access_token) > 0, 'Access token is missing, please authenticate with authenticate_token() first.'
         new_stream = {
             'src': src,
             'len': length
@@ -231,7 +240,10 @@ class AliveDB:
             'link': link,
             'stream': new_stream
         }
-        r = self.session.post(self.socketurl+'/pushStream',json=json)
+        headers = None
+        if self.requires_access_token:
+            headers = { 'Authorization': 'Bearer '+self.access_token }
+        r = self.session.post(self.socketurl+'/pushStream',json=json, headers=headers)
         if r.status_code == 200:
             self.recent_hashes.append(src)
             self.recent_lengths.append(length)
@@ -250,3 +262,36 @@ class AliveDB:
         self.recent_lengths = []
         self.last_pop_ts = time.time()
         return streams
+    
+    def authenticate_token(self, wif: str, username: str, link: str, api: str, network: str = 'hive') -> None:
+        """
+        Retrive access token for endpoints that require it
+        """
+        if self.requires_access_token is False:
+            return
+        signed_msg = sign_message(AliveDB.generate_message_to_sign(username, link, network, self.auth_identifier, api),wif)
+        headers = { 'Content-Type': 'text/plain' }
+        loginsig = requests.post(self.socketurl+'/getToken',data=signed_msg,headers=headers)
+        if loginsig.status_code != 200:
+            raise RuntimeError('Could not authenticate to endpoint')
+        result = loginsig.json()
+        self.access_token = result['access_token']
+
+    @staticmethod
+    def generate_message_to_sign(username: str, link: str, network: str, auth_id: str, api: str) -> str:
+        """
+        Generate message to sign for AliveDB external endpoint auth
+        """
+        message = username+':'+link+':'+auth_id+':'+network+':'
+        if network == 'hive':
+            try:
+                props = requests.post(api,json={
+                    'jsonrpc': '2.0',
+                    'id': 1,
+                    'method': 'condenser_api.get_dynamic_global_properties',
+                    'params': []
+                }).json()['result']
+                message = message+str(props['head_block_number'])+':'+str(props['head_block_id'])
+            except:
+                raise RuntimeError('Could not fetch dynamic global properties')
+        return message

@@ -226,6 +226,7 @@ class AliveDaemon:
         # Setup instance
         self.instance = instance
         self.alivedb_instance = alivedb_instance
+        self.alivedb_instance.authenticate_token(self.instance.private_key,self.instance.username,self.instance.link,self.instance.api,self.instance.network)
         touchDir(self.instance.data_dir)
         
         if self.instance.next_seq:
