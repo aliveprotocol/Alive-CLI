@@ -1,7 +1,0 @@
-requests_unixsocket>=0.2.0
-requests>=2.25.1
-tabulate>=0.9.0
-opencv-python
-base58>=2.0.1
-beem>=0.24.20
-secp256k1prp>=0.13.3
