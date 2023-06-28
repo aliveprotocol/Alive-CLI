@@ -1,0 +1,3 @@
+# only used by stream_downloader.py
+ffmpeg_python==0.2.0
+youtube_dl>=2021.6.6
