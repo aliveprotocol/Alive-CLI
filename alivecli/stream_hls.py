@@ -13,14 +13,9 @@ from threading import Thread
 import time
 from beem import Hive
 from beemgraphenebase import account
-import oneloveipfs
-
-if '.' in __name__:
-    from . import constants
-    from .alivedb import AliveDB
-else:
-    import constants
-    from alivedb import AliveDB
+from . import oneloveipfs
+from . import constants
+from .alivedb import AliveDB
 
 def touchDir(dir, strict = False):
     if (strict == True and os.path.isdir(dir)):

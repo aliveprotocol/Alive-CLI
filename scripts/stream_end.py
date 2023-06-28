@@ -1,10 +1,6 @@
 import sys
 from pprint import pprint
-
-if '.' in __name__:
-    from . import constants
-else:
-    import constants
+from alivecli import constants
 
 if len(sys.argv) != 6:
     print('Usage: python3 ' + sys.argv[0] + ' <network> <api_node> <link> <username> <private_key>')

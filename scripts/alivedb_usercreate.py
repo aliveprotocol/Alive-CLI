@@ -1,5 +1,5 @@
 from time import sleep
-from alivedb import AliveDB
+from alivecli.alivedb import AliveDB
 import sys
 import string
 import random

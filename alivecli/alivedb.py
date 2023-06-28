@@ -5,7 +5,7 @@ import requests
 import requests_unixsocket
 import time
 import hashlib
-from oneloveipfs import sign_message
+from .oneloveipfs import sign_message
 
 if '.' in __name__:
     from .alivedb_integrity import integrity
