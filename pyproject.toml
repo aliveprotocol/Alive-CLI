@@ -20,3 +20,7 @@ secp256k1prp = "^0.13.3"
 
 [tool.poetry.scripts]
 alivecli = "alivecli.alivecli:main"
+alivedb_install = "alivecli.scripts.alivedb_install:main"
+alivedb_usercreate = "alivecli.scripts.alivedb_usercreate:main"
+alive_configure = "alivecli.scripts.stream_configure:main"
+alive_end = "alivecli.scripts.stream_end:main"
