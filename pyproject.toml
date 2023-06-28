@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "AliveCLI"
 version = "0.1.0"
 description = "Core Alive daemon and CLI tool for publishing HLS streams to decentralized networks"
-authors = ["techcoderx"]
+authors = ["techcoderx <engtianxi@outlook.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
