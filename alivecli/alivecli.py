@@ -30,8 +30,8 @@ def main():
     required_args.add_argument('-a','--api', help='API node URL', required=True, metavar='', default=argparse.SUPPRESS)
     required_args.add_argument('-ha','--halive_api', help='HAlive API node URL', required=True, metavar='', default=argparse.SUPPRESS)
     required_args.add_argument('-u','--user', help='Username', required=True, metavar='', default=argparse.SUPPRESS)
-    required_args.add_argument('-k','--key', help='Private key (Avalon custom key must have PLAYLIST_JSON and PLAYLIST_PUSH permissions)', required=True, metavar='', default=argparse.SUPPRESS)
-    required_args.add_argument('-l','--link', help='Livestream permlink, generated at post creation', required=True, metavar='', default=argparse.SUPPRESS)
+    required_args.add_argument('-k','--key', help='Private Posting Key', required=True, metavar='', default=argparse.SUPPRESS)
+    required_args.add_argument('-l','--link', help='Livestream permlink', required=True, metavar='', default=argparse.SUPPRESS)
     required_args.add_argument('-bi','--batch_interval', help='Number of seconds of stream segments to bundle into each chunk', required=True, type=int, metavar='', default=300)
 
     alivedb_args = parser.add_argument_group('AliveDB arguments')

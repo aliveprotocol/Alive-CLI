@@ -6,7 +6,7 @@ This is the main daemon that is used by streamers to upload .ts segments of a lo
 
 ## Pre-requisites
 
-Python 3.7+, `pip3` package manager and AliveDB dependencies are required.
+Python 3.8+, `pip3` package manager and AliveDB dependencies are required.
 
 Additionally, the following packages are required for its dependency packages to be installed successfully:
 
@@ -37,11 +37,29 @@ You may also want to install IPFS node for uploading .ts segments to your local 
 * [ipfs-desktop](https://github.com/ipfs-shipyard/ipfs-desktop/releases)
 
 ## Installation
+
+### Clone repository
 ```bash
 git clone https://github.com/aliveprotocol/Alive-CLI
 cd Alive-CLI
-pip3 install -r requirements.txt
-python3 alivedb_install.py
+```
+
+### Setup virtual environment
+
+To create the virtual environment (one-time):
+```bash
+python3 -m venv .venv --prompt alivecli
+```
+
+To enter the virtual environment:
+```bash
+source .venv/bin/activate
+```
+
+### Install in virtual environment
+```bash
+pip3 install . --use-pep517
+alivedb_install
 ```
 
 The default data directory is `~/.alive` where all Alive working files will be stored.
@@ -52,19 +70,19 @@ Begin from step 3 if streaming directly on-chain.
 
 1. If not already, create an AliveDB user account.
 ```bash
-python3 alivedb_usercreate.py <new_alivedb_password>
+alivedb_usercreate <new_alivedb_password>
 ```
 
 2. Publish your AliveDB public key to your new stream.
 ```bash
-python3 stream_configure.py hive <hive_api_node> <link> <alivedb_pubkey> <username> <posting_key>
+alive_configure hive <hive_api_node> <link> <alivedb_pubkey> <username> <posting_key>
 ```
 
 3. Setup OBS recording output settings according to the config below.
 
 4. Start the Alive daemon. To get CLI usage info:
 ```bash
-python3 alivecli.py -h
+alivecli --help
 ```
 
 5. Start recording in OBS.
@@ -76,7 +94,7 @@ python3 alivecli.py -h
 3. Let the world know that the stream has ended so that the stream archive will be seekable.
 
 ```bash
-python3 stream_end.py hive <hive_api_node> <link> <username> <posting_key>
+alive_end hive <hive_api_node> <link> <username> <posting_key>
 ```
 
 ## OBS Recording Output Config
@@ -91,3 +109,7 @@ Your recording output configuration must match the settings below. Failing to do
 - Container format: **hls**
 - Muxer settings: **hls_time=10**
 - Keyframe interval: Set this to 10x your framerate. For example, if you're recording at 30fps, set this value to 300.
+
+## Programmatic Usage
+
+The Alive daemon can be invoked programmatically in Python as well. For a detailed guide (including example code snippets), check out the [Streamer SDK](https://aliveprotocol.com/docs/develop/streamer-sdk) developer documentation.
