@@ -1,5 +1,5 @@
 # Start with a base Python 3.10 image
-FROM python:3.10-slim-buster
+FROM python:3.10-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
