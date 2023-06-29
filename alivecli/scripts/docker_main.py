@@ -1,6 +1,6 @@
 from alivecli.stream_hls import AliveDaemon, AliveInstance
 from alivecli.alivedb import AliveDB
-from signal import signal, SIGINT
+from signal import signal, SIGTERM
 from os import getenv
 
 def main():
@@ -20,5 +20,5 @@ def main():
     )
 
     alive_daemon = AliveDaemon(instance=alive_instance,alivedb_instance=alivedb_instance)
-    signal(SIGINT,alive_daemon.sigint_handler)
+    signal(SIGTERM,alive_daemon.sigint_handler)
     alive_daemon.start_worker()
