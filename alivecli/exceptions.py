@@ -28,6 +28,12 @@ class AliveAuthRequestException(Exception):
     """
     pass
 
+class AliveDBIntegrityException(Exception):
+    """
+    AliveDB source files checksum error
+    """
+    pass
+
 class AliveDeprecationException(Exception):
     """
     Deprecated Alive Protocol features

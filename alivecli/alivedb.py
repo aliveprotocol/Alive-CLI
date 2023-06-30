@@ -1,3 +1,4 @@
+from typing import List
 import os
 import subprocess
 import signal
@@ -20,6 +21,47 @@ def is_git_installed() -> bool:
     Check for git installation
     """
     return os.system('git --version') == 0
+
+def quicksort(arr: List[str]) -> List[str]:
+    """
+    Quicksort algorithm for list of strings ascending
+    """
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quicksort(left) + middle + quicksort(right)
+
+def alivedb_list_src(alivedir: str = default_data_dir) -> List[str]:
+    """
+    List source files in AliveDB for checksum computation
+    """
+    alivedb_dir_root = os.path.join(alivedir,'AliveDB')
+    alivedb_dir_src = os.path.join(alivedb_dir_root,'src')
+    files = []
+    package_files = ['package.json','package-lock.json']
+    for i in package_files:
+        if os.path.isfile(os.path.join(alivedb_dir_root,i)):
+            files.append(i)
+    if os.path.isdir(alivedb_dir_src):
+        for i in quicksort(os.listdir(alivedb_dir_src)):
+            files.append('src/'+i)
+    return files
+
+def alivedb_calculate_sha256(alivedir: str = default_data_dir) -> str:
+    """
+    Calculate SHA256 hash of AliveDB source files
+    """
+    alivedb_dir_root = os.path.join(alivedir,'AliveDB')
+    files = alivedb_list_src(alivedir)
+    m = hashlib.sha256()
+    for i in files:
+        with open(os.path.join(alivedb_dir_root,i),'rb') as opened:
+            for byte_block in iter(lambda: opened.read(4096),b""):
+                m.update(byte_block)
+    return m.hexdigest()
 
 def alivedb_is_installed_with_git(alivedir: str = default_data_dir) -> bool:
     """
@@ -63,27 +105,24 @@ def alivedb_dependency_check() -> bool:
         raise AliveMissingDependencyExeption('npm is not installed')
     return True
 
-def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, dependency_check: bool = False) -> bool:
+def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, dependency_check: bool = False) -> str:
     """
     Verifies the integrity of AliveDB installation.
+
+    Returns the installed version, or `dev` if `dev_mode` is `True`.
+
+    Raises `AliveMissingDependencyExeption` for missing dependencies and `AliveDBIntegrityException` for invalid checksums.
     """
     if dependency_check:
-        try:
-            alivedb_dependency_check()
-        except AliveMissingDependencyExeption:
-            return False
-    for f in integrity:
-        test_file = alivedir+'/AliveDB/'+f
-        if os.path.exists(test_file) is False:
-            return False
-        if dev_mode is False:
-            sha256_hash = hashlib.sha256()
-            with open(test_file,"rb") as opened_file:
-                for byte_block in iter(lambda: opened_file.read(4096),b""):
-                    sha256_hash.update(byte_block)
-                if sha256_hash.hexdigest() != integrity[f]:
-                    return False
-    return True
+        alivedb_dependency_check()
+    if dev_mode is False:
+        checksum = alivedb_calculate_sha256(alivedir)
+        for i in integrity:
+            if integrity[i] == checksum:
+                return i
+        raise AliveDBIntegrityException('AliveDB checksum error')
+    else:
+        return 'dev'
 
 class AliveDB:
     """
@@ -98,8 +137,9 @@ class AliveDB:
     requires_access_token = False
     access_token = ''
     auth_identifier = ''
+    dev_mode = False
 
-    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, chat_listener: str = '') -> None:
+    def __init__(self, alivedir: str = default_data_dir+'/AliveDB', peers: list = [], gun_port = None, chat_listener: str = '', dev_mode: bool = False) -> None:
         """
         Instantiates an AliveDB instance.
 
@@ -107,6 +147,7 @@ class AliveDB:
         :peers: List of GunDB P2P endpoints
         :gun_port: GunDB P2P port to bind to
         """
+        self.dev_mode = dev_mode
         self.process = None
         self.external_process = alivedir.startswith('http://') or alivedir.startswith('https://')
 
@@ -142,10 +183,10 @@ class AliveDB:
         """
         Starts AliveDB daemon.
         """
-        # TODO Check AliveDB installation
         if self.process is not None or self.external_process is False:
             return
         os.chdir(self.alivedir)
+        print('AliveDB version:',alivedb_integrity(self.alivedir,self.dev_mode,True))
         cmd = ['node','src/index.js']
         if len(self.peers) > 0:
             cmd.append('--peers='+str(self.peers))
