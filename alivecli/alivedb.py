@@ -5,11 +5,20 @@ import requests
 import requests_unixsocket
 import time
 import hashlib
+import zipfile
+import io
 from .oneloveipfs import sign_message
 from .alivedb_integrity import integrity
 
 default_data_dir = os.path.expanduser(os.path.join('~', '.alive'))
 default_tag = 'master'
+default_repo = 'https://github.com/techcoderx/AliveDB'
+
+def is_git_installed() -> bool:
+    return os.system('git --version') == 0
+
+def is_installed_with_git(alivedir: str = default_data_dir) -> bool:
+    return os.path.exists(os.path.join(alivedir,'AliveDB','.git'))
 
 def alivedb_setup_nvm() -> None:
     """
@@ -25,10 +34,15 @@ def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) ->
     """
     alivedb_dependency_check()
     os.chdir(alivedir)
-    # TODO: Download tagged zip source code?
-    os.system('git clone https://github.com/techcoderx/AliveDB')
+    if is_git_installed():
+        os.system(f'git clone -b {tag} {default_repo}')
+    else:
+        r = requests.get(f'{default_repo}/archive/{tag}.zip')
+        r.raise_for_status()
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        z.extractall(path=alivedir)
+        os.rename(f'AliveDB-{tag}','AliveDB')
     os.chdir('AliveDB')
-    os.system('git checkout '+tag)
     os.system('npm i')
 
 def alivedb_dependency_check() -> bool:
@@ -40,8 +54,6 @@ def alivedb_dependency_check() -> bool:
         raise RuntimeError('NodeJS is not installed')
     if os.system('npm -v') > 0:
         raise RuntimeError('npm is not installed')
-    if os.system('git --version') > 0:
-        raise RuntimeError('Git is not installed')
     return True
 
 def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, dependency_check: bool = False) -> bool:
