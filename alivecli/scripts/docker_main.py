@@ -8,6 +8,7 @@ def main():
 
     alive_instance = AliveInstance(
         data_dir=getenv('ALIVE_DATA_DIR'),
+        record_folder=getenv('ALIVE_RECORD_FOLDER'),
         protocol='IPFS',
         upload_endpoint=getenv('ALIVE_UPLOAD_ENDPOINT'),
         network='hive',

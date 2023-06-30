@@ -21,6 +21,8 @@ RUN pip install . --use-pep517
 
 # Default variables
 ENV ALIVE_BATCH_INTERVAL=60
+ENV ALIVE_DATA_DIR=/app/data
+ENV ALIVE_RECORD_FOLDER=/app/record
 
 # Run daemon
 CMD ["alive_docker"]
