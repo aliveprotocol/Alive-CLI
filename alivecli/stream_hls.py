@@ -15,6 +15,7 @@ from beem import Hive
 from beemgraphenebase import account
 from . import oneloveipfs
 from . import constants
+from .exceptions import *
 from .alivedb import AliveDB
 
 def touchDir(dir, strict = False):
@@ -117,7 +118,7 @@ class AliveInstance:
         Validates each value passed in AliveInstance and performs neccessary authentication.
         """
         if self.protocol == 'skynet':
-            raise RuntimeError('Skynet is deprecated')
+            raise AliveDeprecationException('Skynet is deprecated')
         elif self.protocol not in constants.valid_protocols:
             raise ValueError('Invalid P2P protocol. Valid values are IPFS.')
 
@@ -136,7 +137,7 @@ class AliveInstance:
 
         # Network authentication and sequence check
         if self.network == 'avalon':
-            raise RuntimeError('Avalon network is deprecated')
+            raise AliveDeprecationException('Avalon network is deprecated')
         elif self.network == 'hive':
             hive_pubkey = str(account.PrivateKey(wif=self.private_key).get_public_key())[3:]
             valid_key = False
@@ -149,23 +150,23 @@ class AliveInstance:
             # support posting authorities from other accounts?
             hive_acckeys_req = requests.post(self.api,json=hive_accreq)
             if hive_acckeys_req.status_code != 200:
-                raise RuntimeError('Could not fetch Hive account, status code: '+str(hive_acckeys_req.status_code))
+                raise AliveBlockchainAPIException('Could not fetch Hive account, status code: '+str(hive_acckeys_req.status_code))
             hive_acckeys = hive_acckeys_req.json()['result'][0]['posting']
             for i in range(len(hive_acckeys['key_auths'])):
                 if hive_acckeys['key_auths'][i][0][3:] == hive_pubkey:
                     valid_key = True
                     break
             if valid_key != True:
-                raise RuntimeError('Invalid Hive private posting key')
+                raise AliveAuthException('Invalid Hive private posting key')
             self.graphene_client = Hive(node=self.api,keys=[self.private_key])
 
             # Fetch playlist from HAF node
             playlist = requests.get(self.halive_api+'/get_stream_info?stream_author='+self.username+'&stream_link='+self.link)
             if playlist.status_code != 200:
-                raise RuntimeError('Failed to fetch stream info')
+                raise AliveRequestException('Failed to fetch stream info')
             playlistJson = playlist.json()
             if 'error' in playlistJson:
-                raise RuntimeError(playlistJson['error'])
+                raise AliveRequestException(playlistJson['error'])
             if playlistJson['chunk_finalized'] is not None:
                 self.next_seq = playlistJson['chunk_finalized']+1
                 print('Next sequence: '+str(self.next_seq))
@@ -194,7 +195,7 @@ class AliveInstance:
             # Obtain access token
             token = oneloveipfs.login(signed)
             if token['error']:
-                raise RuntimeError(token['error'])
+                raise AliveAuthRequestException(token['error'])
             return token['access_token']
         elif self.protocol == 'IPFS':
             return 'ipfsdaemon'
@@ -301,7 +302,9 @@ class AliveDaemon:
             if len(hashes) > 1 and len(lengths) > 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
                 chunk_hash = self.process_chunk(hashes,lengths)
-                if self.instance.network == 'hive':
+                if chunk_hash == '':
+                    print('Failed to process chunks')
+                elif self.instance.network == 'hive':
                     self.push_stream_graphene(chunk_hash)
             elif len(hashes) == 1 and len(lengths) == 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
@@ -332,7 +335,7 @@ class AliveDaemon:
             if self.instance.protocol == 'IPFS':
                 skylink = self.ipfs_push(filePath)
 
-            if (skylink != False and len(skylink) >= 46):
+            if (len(skylink) >= 46):
                 skylink = skylink.replace("sia://", "")
                 self.filearr[fileId].skylink = skylink
                 if self.filearr[fileId].status != 'share failed':
@@ -426,10 +429,10 @@ class AliveDaemon:
                     return json.loads(upload.text)['hash']
                 else:
                     logging.error('IPFS upload errored',upload.text)
-                    return False
+                    return ''
             except Exception:
                 logging.error('IPFS upload failed')
-                return False
+                return ''
         else:
             # Assume IPFS API unless stated otherwise
             fileToAdd = {'file': open(filePath,'rb')}

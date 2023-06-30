@@ -3,6 +3,7 @@ OneLoveIPFS hosting service Python API
 """
 import requests
 from beemgraphenebase import ecdsasig
+from .exceptions import *
 
 DEFAULT_ENDPOINT = 'https://uploader.oneloveipfs.com'
 
@@ -18,9 +19,9 @@ def generate_message_to_sign(username: str, network: str, auth_id: str, api: str
             }).json()['result']
             message = message+str(props['head_block_number'])+':'+str(props['head_block_id'])
         except:
-            raise RuntimeError('Could not fetch dynamic global properties')
+            raise AliveBlockchainAPIException('Could not fetch dynamic global properties')
     elif network == 'avalon' or network == 'avalon':
-        raise RuntimeError('Avalon network is deprecated')
+        raise AliveDeprecationException('Avalon network is deprecated')
     return message
 
 def sign_message(message: str, priv_key: str) -> str:
@@ -30,5 +31,5 @@ def login(signed_msg: str, endpoint: str = DEFAULT_ENDPOINT) -> dict:
     headers = { 'Content-Type': 'text/plain' }
     loginsig = requests.post(endpoint+'/loginsig',data=signed_msg,headers=headers)
     if loginsig.status_code != 200:
-        raise RuntimeError('Could not authenticate to upload endpoint')
+        raise AliveAuthRequestException('Could not authenticate to upload endpoint')
     return loginsig.json()

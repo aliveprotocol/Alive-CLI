@@ -1,6 +1,7 @@
 import sys
 from pprint import pprint
 from alivecli import constants
+from alivecli.exceptions import AliveBlockchainAPIException
 
 def main():
     if len(sys.argv) < 7:
@@ -18,7 +19,7 @@ def main():
         gw = sys.argv[7]
 
     if sys.argv[1] == 'avalon':
-        raise RuntimeError('Avalon network is deprecated')
+        raise AliveBlockchainAPIException('Avalon network is deprecated')
     elif sys.argv[1] == 'hive':
         # Hive
         from beem import Hive

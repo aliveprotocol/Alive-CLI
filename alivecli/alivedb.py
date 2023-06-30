@@ -7,6 +7,7 @@ import time
 import hashlib
 import zipfile
 import io
+from .exceptions import *
 from .oneloveipfs import sign_message
 from .alivedb_integrity import integrity
 
@@ -15,9 +16,15 @@ default_tag = 'master'
 default_repo = 'https://github.com/techcoderx/AliveDB'
 
 def is_git_installed() -> bool:
+    """
+    Check for git installation
+    """
     return os.system('git --version') == 0
 
-def is_installed_with_git(alivedir: str = default_data_dir) -> bool:
+def alivedb_is_installed_with_git(alivedir: str = default_data_dir) -> bool:
+    """
+    Check if AliveDB is installed using git
+    """
     return os.path.exists(os.path.join(alivedir,'AliveDB','.git'))
 
 def alivedb_setup_nvm() -> None:
@@ -47,13 +54,13 @@ def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) ->
 
 def alivedb_dependency_check() -> bool:
     """
-    Test NodeJS, npm and Git installation.
+    Test NodeJS and npm installation.
     """
     alivedb_setup_nvm()
     if os.system('node -v') > 0:
-        raise RuntimeError('NodeJS is not installed')
+        raise AliveMissingDependencyExeption('NodeJS is not installed')
     if os.system('npm -v') > 0:
-        raise RuntimeError('npm is not installed')
+        raise AliveMissingDependencyExeption('npm is not installed')
     return True
 
 def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, dependency_check: bool = False) -> bool:
@@ -63,7 +70,7 @@ def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, 
     if dependency_check:
         try:
             alivedb_dependency_check()
-        except RuntimeError:
+        except AliveMissingDependencyExeption:
             return False
     for f in integrity:
         test_file = alivedir+'/AliveDB/'+f
@@ -121,7 +128,7 @@ class AliveDB:
             # fetch login
             alivedb_session_login = self.session.get(self.socketurl+'/currentUser')
             if alivedb_session_login.status_code != 200:
-                raise RuntimeError('Failed to fetch AliveDB login status from external process, status code: '+str(alivedb_session_login.status_code))
+                raise AliveRequestException('Failed to fetch AliveDB login status from external process, status code: '+str(alivedb_session_login.status_code))
             external_login = alivedb_session_login.json()
             if 'pub' in external_login:
                 self.userpub = external_login['pub']
@@ -190,7 +197,7 @@ class AliveDB:
         assert self.external_process is False, 'Unable to login on external process'
         assert self.process is not None, 'AliveDB is not running'
         if len(id) == 0 and len(pub) == 0:
-            raise ValueError('User ID or public key is required')
+            raise AliveAuthException('User ID or public key is required')
         json = { 'key': key }
         if len(id) > 0:
             json['id'] = id
@@ -269,7 +276,7 @@ class AliveDB:
         headers = { 'Content-Type': 'text/plain' }
         loginsig = requests.post(self.socketurl+'/getToken',data=signed_msg,headers=headers)
         if loginsig.status_code != 200:
-            raise RuntimeError('Could not authenticate to endpoint')
+            raise AliveAuthRequestException('Could not authenticate to endpoint')
         result = loginsig.json()
         self.access_token = result['access_token']
 
@@ -289,5 +296,5 @@ class AliveDB:
                 }).json()['result']
                 message = message+str(props['head_block_number'])+':'+str(props['head_block_id'])
             except:
-                raise RuntimeError('Could not fetch dynamic global properties')
+                raise AliveBlockchainAPIException('Could not fetch dynamic global properties')
         return message
