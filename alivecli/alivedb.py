@@ -23,7 +23,6 @@ def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) ->
     """
     Clones AliveDB repository and installs npm dependencies.
     """
-    alivedb_setup_nvm()
     alivedb_dependency_check()
     os.chdir(alivedir)
     # TODO: Download tagged zip source code?
@@ -66,17 +65,6 @@ def alivedb_integrity(alivedir: str = default_data_dir, dev_mode: bool = False, 
                 if sha256_hash.hexdigest() != integrity[f]:
                     return False
     return True
-
-def alivedb_installation_check(alivedir: str = default_data_dir, dev_mode: bool = False):
-    """
-    Checks AliveDB installation and returns its type.
-
-    Returns 1 for source code installation, 0 otherwise.
-    """
-    if alivedb_integrity(alivedir,dev_mode,True) is True:
-        return 1
-    else:
-        return 0
 
 class AliveDB:
     """
