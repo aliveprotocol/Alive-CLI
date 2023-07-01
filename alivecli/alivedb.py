@@ -73,9 +73,10 @@ def alivedb_setup_nvm() -> None:
     """
     Setup Node Version Manager for use in AliveDB.
     """
-    nvm_dir = os.environ['HOME'] + '/.nvm'
-    os.system('[ -s "'+nvm_dir+'/nvm.sh" ] && \. "'+nvm_dir+'/nvm.sh"')
-    os.system('[ -s "'+nvm_dir+'/bash_completion" ] && \. "'+nvm_dir+'/bash_completion"')
+    nvm_dir = os.path.join(os.environ['HOME'], '.nvm')
+    if os.path.exists(nvm_dir):
+        os.system('[ -s "'+nvm_dir+'/nvm.sh" ] && \. "'+nvm_dir+'/nvm.sh"')
+        os.system('[ -s "'+nvm_dir+'/bash_completion" ] && \. "'+nvm_dir+'/bash_completion"')
 
 def alivedb_install(alivedir: str = default_data_dir, tag: str = default_tag) -> None:
     """
