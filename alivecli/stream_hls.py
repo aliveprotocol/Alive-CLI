@@ -379,17 +379,24 @@ class AliveDaemon:
                 toShare.append(nextToShare)
                 nextToShare = nextToShare + 1
             if len(toShare) > 0 and (self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval):
-                if self.share(toShare) == True:
-                    self.last_shared_fileid = toShare[len(toShare)-1]
+                if self.alivedb_instance is not None:
+                    if self.share(toShare):
+                        self.last_shared_fileid = toShare[len(toShare)-1]
+                    else:
+                        time.sleep(5)
                 else:
-                    time.sleep(10)
+                    while len(toShare) > 0:
+                        if self.share([toShare[0]]):
+                            self.last_shared_fileid = toShare[0]
+                            toShare.pop(0)
+                        else:
+                            time.sleep(5)
+                            break
             time.sleep(0.2)
 
     def share(self, fileIds: List[int]) -> bool:
         assert len(fileIds) > 0, 'fileIds must contain at least one item'
         link, length = [], []
-        if self.alivedb_instance is None:
-            fileIds = [fileIds[0]]
         for i in fileIds:
             self.filearr[i].status = FileStatus.SHARING
             link.append(self.filearr[i].skylink)
@@ -416,7 +423,8 @@ class AliveDaemon:
         if broadcast_stream is True:
             for i in fileIds:
                 self.filearr[i].status = FileStatus.SHARED
-            self.alivedb_instance.pop_recent_streams()
+            if self.alivedb_instance is not None:
+                self.alivedb_instance.pop_recent_streams()
         else:
             logging.error('Failed to push stream')
             for i in fileIds:
