@@ -463,22 +463,15 @@ class AliveDaemon:
                 logging.error('IPFS upload failed')
                 return ''
         else:
-            csv_tmpfile = 'chunk_' + str(round(time.time()*1000))
-            f = open(csv_tmpfile,'x')
-            f.write(csv_content)
-            f.close()
             try:
-                fileToAdd = {'file': open(csv_tmpfile)}
+                fileToAdd = {'file': csv_content}
                 upload = requests.post(self.instance.upload_endpoint+'/api/v0/add',files=fileToAdd)
-                fileToAdd['file'].close()
                 if upload.status_code == 200:
                     return upload.json()['Hash']
                 else:
                     logging.error('IPFS add chunk failed')
                     return ''
             except Exception as e:
-                fileToAdd['file'].close()
-                os.remove(csv_tmpfile)
                 logging.error('IPFS add chunk failed',e)
                 return ''
 
