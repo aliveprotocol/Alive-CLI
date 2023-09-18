@@ -331,12 +331,11 @@ class AliveDaemon:
         # upload file until success
         while True:
             # upload and retry if fails with backup portals
-            skylink = False
+            skylink = ''
             if self.instance.protocol == 'IPFS':
                 skylink = self.ipfs_push(filePath)
 
             if (len(skylink) >= 46):
-                skylink = skylink.replace("sia://", "")
                 self.filearr[fileId].skylink = skylink
                 if self.filearr[fileId].status != 'share failed':
                     self.filearr[fileId].status = 'share queued'
@@ -443,11 +442,11 @@ class AliveDaemon:
                     return upload.json()['Hash']
                 else:
                     logging.error('IPFS add failed')
-                    return False
+                    return ''
             except Exception as e:
                 fileToAdd['file'].close()
                 logging.error('IPFS add request failed',e)
-                return False
+                return ''
 
     def ipfs_chunk(self, hashes: list, lengths: list) -> str:
         assert len(hashes) == len(lengths), 'hashes and lengths lists should have the same length'
