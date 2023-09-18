@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List
 from enum import Enum
 import re
 import logging
@@ -61,11 +62,9 @@ def updateDisplay(filearr):
     print_str = '\n\n\n\n\n\n\n\n\n'
     print_str += 'Status symbols:\n'
     symbarray = []
-    idx = 0
     
     for s in FileStatus:
         symbarray.append([s.name.lower().replace('_', ' '), s.value])
-        idx += 1
     table = (tabulate(symbarray, headers=['symbol', 'status'], tablefmt='orgtbl'))
     print_str += table + '\n\n\n'
 
@@ -79,7 +78,7 @@ def updateDisplay(filearr):
     for i in range(ran):
         ind = -ran+i
         file.append(filearr[ind].fileId)
-        status.append(filearr[ind].status)
+        status.append(filearr[ind].status.value)
         videoLength = round(filearr[ind].length)
         if (videoLength == -1):
             length.append('')
@@ -219,9 +218,11 @@ class AliveDaemon:
     """
     concurrent_uploads = 0
     nextStreamFilename = 0
+    last_shared_fileid = -1
     chunk_count = 0
     stream_filename = ''
     is_running = False
+    stopped = False
 
     def __init__(self, instance: AliveInstance, alivedb_instance: AliveDB = None):
         """
@@ -292,12 +293,20 @@ class AliveDaemon:
                 time.sleep(1)
 
     def stop_worker(self, exit: bool) -> None:
+        if self.stopped:
+            return
         print('Stopping Alive daemon...')
+        self.stopped = True
         self.is_running = False
         
         # Push all remaining AliveDB stream data to blockchains if any
         if self.alivedb_instance is not None:
-            hashes, lengths = self.alivedb_instance.pop_recent_streams()
+            hashes, lengths = [], []
+            nextToShare = self.last_shared_fileid + 1
+            while self.filearr[nextToShare].status == FileStatus.SHARE_QUEUED or self.filearr[nextToShare].status == FileStatus.SHARE_FAILED:
+                hashes.append(self.filearr[nextToShare].skylink)
+                lengths.append(round(self.filearr[nextToShare].length,3))
+                nextToShare = nextToShare + 1
             if len(hashes) > 1 and len(lengths) > 1:
                 print('Pushing ' + str(len(hashes)) + ' stream chunks from AliveDB to ' + self.instance.network + '...')
                 chunk_hash = self.process_chunk(hashes,lengths)
@@ -329,12 +338,13 @@ class AliveDaemon:
 
         # upload file until success
         while True:
-            # upload and retry if fails with backup portals
             skylink = ''
             if self.instance.protocol == 'IPFS':
                 skylink = self.ipfs_push(filePath)
 
-            if (len(skylink) >= 46):
+            push_success = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,skylink,round(self.filearr[fileId].length,3))
+
+            if (len(skylink) >= 46) and push_success:
                 self.filearr[fileId].skylink = skylink
                 if self.filearr[fileId].status != FileStatus.SHARE_FAILED:
                     self.filearr[fileId].status = FileStatus.SHARE_QUEUED
@@ -344,7 +354,7 @@ class AliveDaemon:
                     os.remove(filePath)
                 return True
             else:
-                logging.error('Upload failed with all portals for ' + str(filePath))
+                logging.error('Upload failed for ' + str(filePath))
                 self.filearr[fileId].status = FileStatus.REUPLOAD_QUEUED
                 time.sleep(10)
                 self.filearr[fileId].status = FileStatus.REUPLOADING
@@ -362,54 +372,57 @@ class AliveDaemon:
                 return False
 
     def share_thread(self):
-        lastSharedFileId = -1
         while self.is_running:
-            nextToShare = lastSharedFileId + 1
-            if self.filearr[nextToShare].status == FileStatus.SHARE_QUEUED or self.filearr[nextToShare].status == FileStatus.SHARE_FAILED:
-                if self.share(nextToShare) == True:
-                    lastSharedFileId += 1
+            toShare = []
+            nextToShare = self.last_shared_fileid + 1
+            while self.filearr[nextToShare].status == FileStatus.SHARE_QUEUED or self.filearr[nextToShare].status == FileStatus.SHARE_FAILED:
+                toShare.append(nextToShare)
+                nextToShare = nextToShare + 1
+            if len(toShare) > 0 and (self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval):
+                if self.share(toShare) == True:
+                    self.last_shared_fileid = toShare[len(toShare)-1]
                 else:
                     time.sleep(10)
             time.sleep(0.2)
 
-    def share(self,fileId):
-        self.filearr[fileId].status = FileStatus.SHARING
+    def share(self, fileIds: List[int]) -> bool:
+        assert len(fileIds) > 0, 'fileIds must contain at least one item'
+        link, length = [], []
+        if self.alivedb_instance is None:
+            fileIds = [fileIds[0]]
+        for i in fileIds:
+            self.filearr[i].status = FileStatus.SHARING
+            link.append(self.filearr[i].skylink)
+            length.append(round(self.filearr[i].length,3))
 
-        link = [self.filearr[fileId].skylink]
-        length = [round(self.filearr[fileId].length,3)]
-
-        broadcast_stream = None
+        broadcast_stream = False
         chunk_hash = None
-        should_push_to_chains = self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval
-        single_segment = False
+        single_segment = len(link) == 1 and len(length) == 1
 
-        if self.alivedb_instance is not None:
-            broadcast_stream = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,link[0],length[0])
-            if should_push_to_chains:
-                link, length = self.alivedb_instance.pop_recent_streams()
-                single_segment = len(link) == 1 and len(length) == 1
-                if single_segment is False:
-                    chunk_hash = self.process_chunk(link,length)
-                    if chunk_hash == '':
-                        logging.error('failed to upload chunk')
-        else:
-            single_segment = True
-        if single_segment:
-            chunk_hash = link[0]+','+str(length[0])
+        if single_segment is False:
+            chunk_hash = self.process_chunk(link,length)
+            if chunk_hash == '':
+                logging.error('failed to upload chunk')
+                for i in fileIds:
+                    self.filearr[i].status = FileStatus.SHARE_FAILED
+                return False
 
-        if self.instance.network == 'hive' and should_push_to_chains:
+        if self.instance.network == 'hive':
             if single_segment:
                 broadcast_stream = self.push_stream_graphene(link[0],length[0])
             else:
                 broadcast_stream = self.push_stream_graphene(chunk_hash)
 
-        if broadcast_stream != True:
-            logging.error('Failed to push stream')
-            self.filearr[fileId].status = FileStatus.SHARE_FAILED
-            return False
+        if broadcast_stream is True:
+            for i in fileIds:
+                self.filearr[i].status = FileStatus.SHARED
+            self.alivedb_instance.pop_recent_streams()
         else:
-            self.filearr[fileId].status = FileStatus.SHARED
-            return True
+            logging.error('Failed to push stream')
+            for i in fileIds:
+                self.filearr[i].status = FileStatus.SHARE_FAILED
+
+        return broadcast_stream
 
     def process_chunk(self, hashes: list, lengths: list):
         if self.instance.protocol == 'IPFS':
