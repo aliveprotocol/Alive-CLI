@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 import re
 import logging
 import os
@@ -17,6 +18,17 @@ from . import oneloveipfs
 from . import constants
 from .exceptions import *
 from .alivedb import AliveDB
+
+class FileStatus(Enum):
+    WAITING_FOR_FILE = ' '
+    UPLOAD_QUEUED = '.'
+    UPLOADING = '↑'
+    REUPLOAD_QUEUED = '↔'
+    REUPLOADING = '↨'
+    SHARE_QUEUED = '▒'
+    SHARING = '▓'
+    SHARED = '█'
+    SHARE_FAILED = 'x'
 
 def touchDir(dir, strict = False):
     if (strict == True and os.path.isdir(dir)):
@@ -45,14 +57,14 @@ def check_ts(recordFolder):
             return True
     return False
 
-def updateDisplay(filearr, symbols):
+def updateDisplay(filearr):
     print_str = '\n\n\n\n\n\n\n\n\n'
     print_str += 'Status symbols:\n'
     symbarray = []
     idx = 0
     
-    for key, value in symbols.items():
-        symbarray.append([value, key])
+    for s in FileStatus:
+        symbarray.append([s.name.lower().replace('_', ' '), s.value])
         idx += 1
     table = (tabulate(symbarray, headers=['symbol', 'status'], tablefmt='orgtbl'))
     print_str += table + '\n\n\n'
@@ -66,9 +78,8 @@ def updateDisplay(filearr, symbols):
     ran = len(filearr) if (len(filearr) < showRows) else showRows
     for i in range(ran):
         ind = -ran+i
-        symbolCode = filearr[ind].status
         file.append(filearr[ind].fileId)
-        status.append(symbols[symbolCode])
+        status.append(filearr[ind].status)
         videoLength = round(filearr[ind].length)
         if (videoLength == -1):
             length.append('')
@@ -87,10 +98,10 @@ def updateDisplay(filearr, symbols):
 class VideoFile:
     def __init__(self, fileId):
         self.fileId = fileId
-        self.status = 'waiting for file'
+        self.status = FileStatus.WAITING_FOR_FILE
         self.uploadTime = -1
         self.length = -1
-        self.skylink = 'skylink'
+        self.skylink = ''
     def __str__(self):
         return str(self.__dict__)
 
@@ -240,18 +251,6 @@ class AliveDaemon:
         logging.info('LOGGING STARTED')
 
     def start_worker(self):
-        symbols = {
-            'waiting for file':             ' ',
-            'upload queued':                '.',
-            'uploading':                    '↑',
-            'uploading with backup portal': '↕',
-            'queued for re-uploading':      '↔',
-            're-uploading':                 '↨',
-            'share queued':                 '▒',
-            'sharing':                      '▓',
-            'shared':                       '█',
-            'share failed':                 'x'
-        }
         touchDir(self.instance.record_folder)
 
         cntr = 0
@@ -281,10 +280,10 @@ class AliveDaemon:
         while self.is_running:
             nextFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename) + ".ts")
             nextAfterFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename + 1) + ".ts")
-            updateDisplay(self.filearr, symbols)
+            updateDisplay(self.filearr)
             if self.concurrent_uploads < 10 and ( os.path.isfile(nextAfterFile) or ( self.isPlaylistFinished(self.instance.record_folder) and os.path.isfile(nextFile) ) ):
                 self.filearr.append(VideoFile(self.nextStreamFilename + 1))
-                self.filearr[self.nextStreamFilename].status = 'upload queued'
+                self.filearr[self.nextStreamFilename].status = FileStatus.UPLOAD_QUEUED
                 nextLen = get_length(nextFile)
                 self.filearr[self.nextStreamFilename].length = nextLen
                 Thread(target=self.upload, args=(nextFile, self.nextStreamFilename, nextLen)).start()
@@ -326,7 +325,7 @@ class AliveDaemon:
     def upload(self, filePath, fileId, length):
         start_time = time.time()
         self.concurrent_uploads += 1
-        self.filearr[fileId].status = 'uploading'
+        self.filearr[fileId].status = FileStatus.UPLOADING
 
         # upload file until success
         while True:
@@ -337,8 +336,8 @@ class AliveDaemon:
 
             if (len(skylink) >= 46):
                 self.filearr[fileId].skylink = skylink
-                if self.filearr[fileId].status != 'share failed':
-                    self.filearr[fileId].status = 'share queued'
+                if self.filearr[fileId].status != FileStatus.SHARE_FAILED:
+                    self.filearr[fileId].status = FileStatus.SHARE_QUEUED
                 self.filearr[fileId].uploadTime = round(time.time() - start_time)
                 self.concurrent_uploads -= 1
                 if self.instance.purge_files == True:
@@ -346,9 +345,9 @@ class AliveDaemon:
                 return True
             else:
                 logging.error('Upload failed with all portals for ' + str(filePath))
-                self.filearr[fileId].status = 'queued for re-uploading'
+                self.filearr[fileId].status = FileStatus.REUPLOAD_QUEUED
                 time.sleep(10)
-                self.filearr[fileId].status = 're-uploading'
+                self.filearr[fileId].status = FileStatus.REUPLOADING
 
     def isPlaylistFinished(self,recordFolder):
         playlistFile = os.path.join(recordFolder, self.stream_filename + ".m3u8")
@@ -366,7 +365,7 @@ class AliveDaemon:
         lastSharedFileId = -1
         while self.is_running:
             nextToShare = lastSharedFileId + 1
-            if self.filearr[nextToShare].status == 'share queued' or self.filearr[nextToShare].status == 'share failed':
+            if self.filearr[nextToShare].status == FileStatus.SHARE_QUEUED or self.filearr[nextToShare].status == FileStatus.SHARE_FAILED:
                 if self.share(nextToShare) == True:
                     lastSharedFileId += 1
                 else:
@@ -374,7 +373,7 @@ class AliveDaemon:
             time.sleep(0.2)
 
     def share(self,fileId):
-        self.filearr[fileId].status = 'sharing'
+        self.filearr[fileId].status = FileStatus.SHARING
 
         link = [self.filearr[fileId].skylink]
         length = [round(self.filearr[fileId].length,3)]
@@ -406,10 +405,10 @@ class AliveDaemon:
 
         if broadcast_stream != True:
             logging.error('Failed to push stream')
-            self.filearr[fileId].status = 'share failed'
+            self.filearr[fileId].status = FileStatus.SHARE_FAILED
             return False
         else:
-            self.filearr[fileId].status = 'shared'
+            self.filearr[fileId].status = FileStatus.SHARED
             return True
 
     def process_chunk(self, hashes: list, lengths: list):
