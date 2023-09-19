@@ -146,9 +146,7 @@ class AliveInstance:
             self.record_folder = os.path.join(self.data_dir, self.record_folder)
 
         # Network authentication and sequence check
-        if self.network == 'avalon':
-            raise AliveDeprecationException('Avalon network is deprecated')
-        elif self.network == 'hive':
+        if self.network == 'hive':
             hive_pubkey = str(account.PrivateKey(wif=self.private_key).get_public_key())[3:]
             valid_key = False
             hive_accreq = {

@@ -20,7 +20,7 @@ def generate_message_to_sign(username: str, network: str, auth_id: str, api: str
             message = message+str(props['head_block_number'])+':'+str(props['head_block_id'])
         except:
             raise AliveBlockchainAPIException('Could not fetch dynamic global properties')
-    elif network == 'avalon' or network == 'avalon':
+    elif network == 'avalon':
         raise AliveDeprecationException('Avalon network is deprecated')
     return message
 
