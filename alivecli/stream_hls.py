@@ -338,7 +338,11 @@ class AliveDaemon:
             if self.instance.protocol == 'IPFS':
                 skylink = self.ipfs_push(filePath)
 
-            push_success = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,skylink,round(self.filearr[fileId].length,3))
+            push_success = False
+            if self.alivedb_instance is not None:
+                push_success = self.alivedb_instance.push_stream(self.instance.network,self.instance.username,self.instance.link,skylink,round(self.filearr[fileId].length,3))
+            else:
+                push_success = True
 
             if (len(skylink) >= 46) and push_success:
                 self.filearr[fileId].skylink = skylink
