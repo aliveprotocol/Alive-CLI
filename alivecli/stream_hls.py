@@ -374,19 +374,10 @@ class AliveDaemon:
                 toShare.append(nextToShare)
                 nextToShare = nextToShare + 1
             if len(toShare) > 0 and (self.alivedb_instance is None or time.time() - self.alivedb_instance.last_pop_ts >= self.instance.batch_interval):
-                if self.alivedb_instance is not None:
-                    if self.share(toShare):
-                        self.last_shared_fileid = toShare[len(toShare)-1]
-                    else:
-                        time.sleep(5)
+                if self.share(toShare):
+                    self.last_shared_fileid = toShare[len(toShare)-1]
                 else:
-                    while len(toShare) > 0:
-                        if self.share([toShare[0]]):
-                            self.last_shared_fileid = toShare[0]
-                            toShare.pop(0)
-                        else:
-                            time.sleep(5)
-                            break
+                    time.sleep(5)
             time.sleep(0.2)
 
     def share(self, fileIds: List[int]) -> bool:
