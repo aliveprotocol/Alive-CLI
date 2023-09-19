@@ -216,7 +216,6 @@ class AliveDaemon:
     """
     Main daemon for Alive streams.
     """
-    concurrent_uploads = 0
     nextStreamFilename = 0
     last_shared_fileid = -1
     chunk_count = 0
@@ -282,7 +281,7 @@ class AliveDaemon:
             nextFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename) + ".ts")
             nextAfterFile = os.path.join(self.instance.record_folder, self.stream_filename + str(self.nextStreamFilename + 1) + ".ts")
             updateDisplay(self.filearr)
-            if self.concurrent_uploads < 10 and ( os.path.isfile(nextAfterFile) or ( self.isPlaylistFinished(self.instance.record_folder) and os.path.isfile(nextFile) ) ):
+            if os.path.isfile(nextAfterFile) or ( self.isPlaylistFinished(self.instance.record_folder) and os.path.isfile(nextFile) ):
                 self.filearr.append(VideoFile(self.nextStreamFilename + 1))
                 self.filearr[self.nextStreamFilename].status = FileStatus.UPLOAD_QUEUED
                 nextLen = get_length(nextFile)
@@ -333,7 +332,6 @@ class AliveDaemon:
 
     def upload(self, filePath, fileId, length):
         start_time = time.time()
-        self.concurrent_uploads += 1
         self.filearr[fileId].status = FileStatus.UPLOADING
 
         # upload file until success
@@ -349,7 +347,6 @@ class AliveDaemon:
                 if self.filearr[fileId].status != FileStatus.SHARE_FAILED:
                     self.filearr[fileId].status = FileStatus.SHARE_QUEUED
                 self.filearr[fileId].uploadTime = round(time.time() - start_time)
-                self.concurrent_uploads -= 1
                 if self.instance.purge_files == True:
                     os.remove(filePath)
                 return True
