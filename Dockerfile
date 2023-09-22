@@ -24,5 +24,8 @@ ENV ALIVE_BATCH_INTERVAL=60
 ENV ALIVE_DATA_DIR=/app/data
 ENV ALIVE_RECORD_FOLDER=/app/record
 
+# Fix for no console output until Ctrl+C
+ENV PYTHONUNBUFFERED=1
+
 # Run daemon
 CMD ["alive_docker"]
