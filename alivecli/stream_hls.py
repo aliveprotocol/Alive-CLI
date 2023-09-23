@@ -449,6 +449,7 @@ class AliveDaemon:
                 upload = requests.post(self.instance.upload_endpoint+'/api/v0/add',files=fileToAdd)
                 fileToAdd['file'].close()
                 if upload.status_code == 200:
+                    logging.info('Added segment '+upload.json()['Hash']+' '+upload.json()['Size'])
                     return upload.json()['Hash']
                 else:
                     logging.error('IPFS add failed')
@@ -476,6 +477,7 @@ class AliveDaemon:
                 fileToAdd = {'file': csv_content}
                 upload = requests.post(self.instance.upload_endpoint+'/api/v0/add',files=fileToAdd)
                 if upload.status_code == 200:
+                    logging.info('Added chunk '+upload.json()['Hash']+' '+upload.json()['Size'])
                     return upload.json()['Hash']
                 else:
                     logging.error('IPFS add chunk failed')
@@ -511,5 +513,4 @@ class AliveDaemon:
             return True
         except Exception as e:
             logging.error('Broadcast error: ' + str(e))
-            logging.error('Custom JSON: ' + json.dumps(json_data))
             return False
