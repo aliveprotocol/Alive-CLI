@@ -3,7 +3,9 @@ import argparse
 import signal
 from .stream_hls import AliveInstance, AliveDaemon
 from .alivedb import AliveDB
-from .alivedb_integrity import version as __version__
+import pkg_resources
+
+__version__ = pkg_resources.get_distribution('alivecli').version
 
 def str2bool(v):
     if isinstance(v, bool):
