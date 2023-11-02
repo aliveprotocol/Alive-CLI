@@ -31,20 +31,20 @@ class FileStatus(Enum):
     SHARED = '█'
     SHARE_FAILED = 'x'
 
-def touchDir(dir, strict = False):
+def touchDir(dir: str, strict = False):
     if (strict == True and os.path.isdir(dir)):
         raise Exception('Folder already exists: ' + dir)
     if not os.path.isdir(dir):
         os.mkdir(dir)
 
-def get_length(filename):
+def get_length(filename: str):
     cap = cv2.VideoCapture(filename)
     fps = cap.get(cv2.CAP_PROP_FPS)      # OpenCV2 version 2 used "CV_CAP_PROP_FPS"
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = frame_count/fps
     return duration
 
-def get_latest_m3u8(recordFolder):
+def get_latest_m3u8(recordFolder: str):
     pattern = os.path.join(recordFolder, '*.m3u8')
     list_of_files = glob.glob(pattern) # * means all if need specific format then *.csv
     if not list_of_files:
@@ -52,7 +52,7 @@ def get_latest_m3u8(recordFolder):
     latest_file = max(list_of_files, key=os.path.getctime)
     return latest_file
 
-def check_ts(recordFolder):
+def check_ts(recordFolder: str) -> bool:
     for file in os.listdir(recordFolder):
         if file.endswith(".ts"):
             return True
@@ -358,7 +358,7 @@ class AliveDaemon:
                 time.sleep(10)
                 self.filearr[fileId].status = FileStatus.REUPLOADING
 
-    def isPlaylistFinished(self,recordFolder):
+    def isPlaylistFinished(self, recordFolder: str):
         playlistFile = os.path.join(recordFolder, self.stream_filename + ".m3u8")
         if (os.stat(playlistFile).st_size == 0):
             return False
